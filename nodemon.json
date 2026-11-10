@@ -1,0 +1,5 @@
+{
+  "watch": ["src", "prisma"],
+  "ext": "ts,json,prisma",
+  "exec": "tsx --no-cache src/server.ts"
+}

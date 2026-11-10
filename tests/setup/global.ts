@@ -1,0 +1,12 @@
+process.env.NODE_ENV ??= "test";
+process.env.PORT ??= "8080";
+process.env.DATABASE_URL ??= "postgresql://asico:asico@localhost:5432/asico?schema=public";
+process.env.LOG_LEVEL ??= "silent";
+process.env.UPLOAD_DIR ??= "uploads";
+process.env.CORS_ORIGINS ??= "";
+process.env.JWT_ACCESS_SECRET ??= "test-only-secret-test-only-secret-0123456789";
+process.env.AUTH_RATE_LIMIT_MAX ??= "1000";
+process.env.REFRESH_RATE_LIMIT_MAX ??= "100000";
+process.env.RATE_LIMIT_MAX ??= "100000";
+process.env.EXPORT_RATE_LIMIT_MAX ??= "100000";
+process.env.SMALL_WORKS_ALERT_JOB_ENABLED ??= "false";

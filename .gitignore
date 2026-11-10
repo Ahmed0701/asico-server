@@ -1,0 +1,22 @@
+# Dependencies and build output
+node_modules/
+dist
+*.tsbuildinfo
+
+# Environment (only the example is tracked)
+.env
+.env.*
+.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Tests and tooling caches
+coverage
+.eslintcache
+
+# Local uploads and generated Prisma client
+uploads/
+src/generated/

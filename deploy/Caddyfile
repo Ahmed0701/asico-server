@@ -1,0 +1,9 @@
+{
+	email {$ACME_EMAIL}
+}
+
+# Caddy gets and renews the HTTPS certificate for the domain by itself.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:80
+}

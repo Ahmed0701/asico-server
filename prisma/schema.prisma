@@ -1,0 +1,723 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+  runtime      = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum ElecPhaseStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// Whether a civil engineer, an electrical engineer or a contractor is still working with us. INACTIVE ones keep their
+// records but no longer appear in the options lists that feed forms.
+enum PartyStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// How a villa is built.
+enum VillaType {
+  ACICO_SYSTEM
+  CONVENTIONAL
+}
+
+// Where a villa's file stands with MEW (the Ministry of Electricity and Water), for the AC and for the electricity.
+enum MewState {
+  NOT_SUBMITTED
+  RUNNING
+  APPROVED
+}
+
+// Where delivered material comes from.
+enum FactoryType {
+  SWITCHGEAR
+  CABLE
+}
+
+enum WorkStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DELAYED
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// MANUAL: typed in by a person. PHASE: made from the progress of an elec phase and kept in step with it.
+enum WorkItemSource {
+  MANUAL
+  PHASE
+}
+
+// The weather a daily report was written in.
+enum Weather {
+  HOT
+  SUNNY
+  WINDY
+  RAINY
+  DUSTY
+}
+
+// Whether a day's small work is finished.
+enum SmallWorkStatus {
+  PENDING
+  DONE
+}
+
+// The kind of a site report (a visit to a villa).
+enum SiteReportType {
+  INSPECTION
+  SAFETY
+  PROGRESS
+  QUALITY
+}
+
+model User {
+  id                  String                  @id @default(uuid())
+  name                String
+  email               String                  @unique
+  passwordHash        String
+  role                Role                    @default(EMPLOYEE)
+  isActive            Boolean                 @default(false)
+  // Incremented by every write to the row; compared by If-Match (see docs/write-safety.md).
+  version             Int                     @default(1)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  permissions         UserPermission[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  createdVillas       Villa[]                 @relation("VillaCreator")
+  mewFollowUpVillas   Villa[]                 @relation("VillaMewFollowUpMarker")
+  mewInspectionVillas Villa[]                 @relation("VillaMewInspectionMarker")
+  mewPassedVillas     Villa[]                 @relation("VillaMewInspectionPassedMarker")
+  uploadedDocuments   VillaDocument[]         @relation("DocumentUploader")
+  auditLogs           AuditLog[]
+  idempotencyKeys     IdempotencyKey[]
+  importBatches       ImportBatch[]
+  workItems           WorkItem[]
+  dailyReports        DailyReport[]
+  dailySmallWorks     DailySmallWork[]
+  siteReports         SiteReport[]
+  dailyLabours        DailyLabour[]
+  notifications       NotificationRecipient[]
+}
+
+model Permission {
+  id    String           @id @default(uuid())
+  code  String           @unique
+  users UserPermission[]
+}
+
+model UserPermission {
+  userId       String
+  permissionId String
+  grantedAt    DateTime   @default(now())
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+}
+
+model RefreshToken {
+  id           String        @id @default(uuid())
+  userId       String
+  tokenHash    String        @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime      @default(now())
+  // Set when this token was spent by a refresh: the token that took its place. revokedAt is then the time of
+  // the rotation. A token revoked any other way (logout, password change, reuse detection) has none.
+  replacedById String?       @unique
+  replacedBy   RefreshToken? @relation("RefreshTokenReplacement", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces     RefreshToken? @relation("RefreshTokenReplacement")
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CivilEngineer {
+  id        String      @id @default(uuid())
+  name      String
+  phone     String
+  email     String?
+  status    PartyStatus @default(ACTIVE)
+  villas    Villa[]
+  version   Int         @default(1)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "CivilEngineer_name_trgm_idx")
+}
+
+model ElectricalEngineer {
+  id           String        @id @default(uuid())
+  name         String
+  phone        String
+  email        String?
+  status       PartyStatus   @default(ACTIVE)
+  villas       Villa[]
+  // The daily reports this engineer prepared. An engineer with reports cannot be deleted.
+  dailyReports DailyReport[]
+  version      Int           @default(1)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "ElectricalEngineer_name_trgm_idx")
+}
+
+// A step of the electrical work that every villa tracks (Ceiling Piping, Sleeves, ...). A table, not an enum, so the
+// list can grow. `sortOrder` is the display order; ACTIVE phases count towards a villa's overall progress.
+// The names are unique ignoring case, through an index written in SQL (Prisma cannot declare it):
+// "ElecPhase_name_lower_key" on lower("name").
+model ElecPhase {
+  id            String               @id @default(uuid())
+  name          String
+  sortOrder     Int
+  status        ElecPhaseStatus      @default(ACTIVE)
+  // What the phase adds to a villa's overall progress once the villa's open work for it is done, 0 to 100 (a CHECK in
+  // SQL). The villa's progress is the ratios of its done active phases added up, at most 100.
+  progressRatio Int                  @default(0) @db.SmallInt
+  version       Int                  @default(1)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  // One row per villa, always (see VillaPhaseProgress). A phase whose rows are all at 0 is deleted together with them.
+  villaProgress VillaPhaseProgress[]
+  // The open works made from this phase's progress, and any others filed under it. A phase with items is in use.
+  workItems     WorkItem[]
+
+  @@index([sortOrder])
+}
+
+model Contractor {
+  id              String           @id @default(uuid())
+  name            String
+  phone           String
+  email           String?
+  status          PartyStatus      @default(ACTIVE)
+  villas          Villa[]
+  workItems       WorkItem[]
+  // The daily reports of this contractor. A contractor with reports cannot be deleted.
+  dailyReports    DailyReport[]
+  // The labour rows that name this contractor. A contractor with labour rows cannot be deleted either.
+  dailyLabours    DailyLabour[]
+  // The small works this contractor is assigned to. A contractor with small works cannot be deleted either.
+  dailySmallWorks DailySmallWork[]
+  version         Int              @default(1)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "Contractor_name_trgm_idx")
+}
+
+// A named area of a city that villas belong to. The number of villas in an area is counted when asked for, never stored.
+// The pair (name, city) is unique ignoring case, through an index written in SQL (Prisma cannot declare it):
+// "Area_name_city_lower_key" on (lower("name"), lower("city")).
+// A villa that needs maintenance. The villa number and the location are typed by hand: they are not linked to the
+// villas. solvedAt is set when someone checks it as solved, which moves it to the solved list.
+// A switchgear or cable factory that delivers material to the villas. The same name can exist once per type.
+model Factory {
+  id         String             @id @default(uuid())
+  name       String
+  type       FactoryType
+  deliveries MaterialDelivery[]
+  version    Int                @default(1)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@unique([type, name])
+}
+
+// The catalog of materials the factories deliver (MSB Box, DB Interior, a cable size...), one list per factory type.
+// A delivery picks its lines from it. An item used by a delivery cannot be deleted (Restrict).
+model MaterialItem {
+  id               String                     @id @default(uuid())
+  name             String
+  type             FactoryType
+  unit             String                     @default("pcs")
+  sortOrder        Int                        @default(0)
+  // How much of it every villa needs (1 unless changed; 0: not needed unless a villa says so). The balance is this minus
+  // what came, so a material no delivery brought shows as not delivered.
+  requiredPerVilla Decimal                    @default(1) @db.Decimal(12, 2)
+  lines            MaterialDeliveryLine[]
+  requirements     VillaMaterialRequirement[]
+  version          Int                        @default(1)
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  @@unique([type, name])
+}
+
+// A villa that needs a different quantity of a catalog item than the catalog's requiredPerVilla (0: it needs none).
+model VillaMaterialRequirement {
+  villaId  String
+  villa    Villa        @relation(fields: [villaId], references: [id], onDelete: Cascade)
+  itemId   String
+  item     MaterialItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity Decimal      @db.Decimal(12, 2)
+
+  @@id([villaId, itemId])
+  @@index([itemId])
+}
+
+// A delivery note file of a delivery (a PDF, JPG or PNG). A delivery can have several; they go with it.
+model MaterialDeliveryNote {
+  id         String           @id @default(uuid())
+  deliveryId String
+  delivery   MaterialDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  key        String
+  name       String
+  mime       String
+  size       Int
+  uploadedAt DateTime         @default(now())
+
+  @@index([deliveryId])
+}
+
+// One material of a delivery and how much of it came. A delivery has each item at most once.
+model MaterialDeliveryLine {
+  id         String           @id @default(uuid())
+  deliveryId String
+  delivery   MaterialDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  itemId     String
+  item       MaterialItem     @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  quantity   Decimal          @db.Decimal(12, 2)
+
+  @@unique([deliveryId, itemId])
+  @@index([itemId])
+}
+
+// A delivery from a factory to a villa: its lines (the materials and quantities) and its delivery note (a PDF or a
+// photo, uploaded later or at once).
+// A villa or a factory that has deliveries cannot be deleted (Restrict).
+model MaterialDelivery {
+  id           String                 @id @default(uuid())
+  villaId      String
+  villa        Villa                  @relation(fields: [villaId], references: [id], onDelete: Restrict)
+  factoryId    String
+  factory      Factory                @relation(fields: [factoryId], references: [id], onDelete: Restrict)
+  noteNumber   String?
+  deliveryDate DateTime               @db.Date
+  lines        MaterialDeliveryLine[]
+  version      Int                    @default(1)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  notes        MaterialDeliveryNote[]
+
+  @@index([villaId])
+  @@index([factoryId])
+  @@index([deliveryDate])
+}
+
+model MaintenanceVilla {
+  id           String    @id @default(uuid())
+  villaNumber  String
+  location     String
+  handoverDate DateTime  @db.Date
+  issue        String
+  solvedAt     DateTime?
+  version      Int       @default(1)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([solvedAt])
+}
+
+model Area {
+  id        String   @id @default(uuid())
+  name      String
+  city      String
+  villas    Villa[]
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Rules the database enforces that Prisma cannot declare (written in the migration):
+// CHECK "Villa_dates_check" (targetDate >= startDate when both are set),
+// CHECK "Villa_budget_check" (budgetMinor >= 0, and budgetMinor and currency are both set or both null).
+// The collation "asico_natural" (ICU, numbers inside text sort by value) is used by the list's ORDER BY.
+model Villa {
+  id                      String                     @id @default(uuid())
+  villaNumber             String                     @unique
+  ownerName               String?
+  // How the villa is built; null for villas saved before the type existed.
+  villaType               VillaType?
+  areaId                  String
+  block                   String
+  plot                    String
+  civilEngineerId         String
+  // The electrical engineer, if one is set. An engineer with villas cannot be deleted.
+  electricalEngineerId    String?
+  // The one contractor building the villa; none yet is allowed. A contractor with villas cannot be deleted.
+  contractorId            String?
+  // Calendar days (DATE), no time of day.
+  startDate               DateTime?                  @db.Date
+  targetDate              DateTime?                  @db.Date
+  // The budget in minor units (fils, piastres, cents) with its ISO 4217 currency; both set or both null.
+  budgetMinor             BigInt?
+  currency                String?                    @db.Char(3)
+  createdById             String
+  // Set when a person puts the villa on the MEW follow-up list. The marker may be deleted later, so the user can be null
+  // while the time stays.
+  mewFollowUpAt           DateTime?
+  mewFollowUpById         String?
+  // Set when a person marks the villa for MEW inspection. Works like the MEW follow-up mark.
+  mewInspectionAt         DateTime?
+  mewInspectionById       String?
+  // Set when a person checks the villa as having passed the MEW inspection: it then leaves the MEW inspection list.
+  mewInspectionPassedAt   DateTime?
+  mewInspectionPassedById String?
+  // The villa's MEW state for the AC and for the electricity, set on the MEW follow-up page.
+  mewAcState              MewState                   @default(NOT_SUBMITTED)
+  mewElecState            MewState                   @default(NOT_SUBMITTED)
+  // The day MEW is to inspect the villa (a calendar day, DATE), picked on the MEW follow-up page; null until then.
+  mewInspectionDate       DateTime?                  @db.Date
+  version                 Int                        @default(1)
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+  area                    Area                       @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  civilEngineer           CivilEngineer              @relation(fields: [civilEngineerId], references: [id], onDelete: Restrict)
+  electricalEngineer      ElectricalEngineer?        @relation(fields: [electricalEngineerId], references: [id], onDelete: Restrict)
+  contractor              Contractor?                @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  createdBy               User                       @relation("VillaCreator", fields: [createdById], references: [id])
+  mewFollowUpBy           User?                      @relation("VillaMewFollowUpMarker", fields: [mewFollowUpById], references: [id], onDelete: SetNull)
+  mewInspectionBy         User?                      @relation("VillaMewInspectionMarker", fields: [mewInspectionById], references: [id], onDelete: SetNull)
+  mewInspectionPassedBy   User?                      @relation("VillaMewInspectionPassedMarker", fields: [mewInspectionPassedById], references: [id], onDelete: SetNull)
+  documents               VillaDocument[]
+  materialDeliveries      MaterialDelivery[]
+  materialRequirements    VillaMaterialRequirement[]
+  phaseProgress           VillaPhaseProgress[]
+  workItems               WorkItem[]
+  dailySmallWorks         DailySmallWork[]
+  siteReports             SiteReport[]
+  dailyLabours            DailyLabour[]
+
+  @@unique([areaId, block, plot])
+  @@index([areaId])
+  @@index([civilEngineerId])
+  @@index([electricalEngineerId])
+  @@index([contractorId])
+  @@index([mewFollowUpById])
+  @@index([mewInspectionById])
+  @@index([mewInspectionPassedById])
+  @@index([ownerName(ops: raw("gin_trgm_ops"))], type: Gin, map: "Villa_ownerName_trgm_idx")
+  @@index([villaNumber(ops: raw("gin_trgm_ops"))], type: Gin, map: "Villa_villaNumber_trgm_idx")
+  @@index([plot(ops: raw("gin_trgm_ops"))], type: Gin, map: "Villa_plot_trgm_idx")
+  @@index([block(ops: raw("gin_trgm_ops"))], type: Gin, map: "Villa_block_trgm_idx")
+}
+
+// How far one phase of one villa has got, 0..100. A row exists for every villa and every phase, active or not: a new villa
+// gets a row per phase and a new phase gets a row per villa, in the transaction that creates it. A phase that is switched
+// off keeps its rows and values and only drops out of the villa's average. The villa's overall progress is never stored.
+// The CHECKs (progress 0..100; completedAt is set exactly when progress is 100) are in the villa_phase_progress migration.
+model VillaPhaseProgress {
+  villaId     String
+  elecPhaseId String
+  progress    Int       @default(0) @db.SmallInt
+  completedAt DateTime?
+  version     Int       @default(1)
+  updatedAt   DateTime  @updatedAt
+  villa       Villa     @relation(fields: [villaId], references: [id], onDelete: Cascade)
+  elecPhase   ElecPhase @relation(fields: [elecPhaseId], references: [id], onDelete: Restrict)
+
+  @@id([villaId, elecPhaseId])
+  @@index([elecPhaseId])
+}
+
+// An open work of a villa, filed under one electrical phase (elecPhaseId, required, for both sources: there is no title and
+// no other kind of phase). A PHASE item is made when its phase gets above 0 and follows the phase from then on (its progress
+// is the phase's); a MANUAL item is typed in under an ACTIVE phase (the service checks that). Written in SQL, because Prisma
+// cannot declare them: the partial unique index "WorkItem_villa_phase_auto_key" ((villaId, elecPhaseId) where source is
+// PHASE) and the CHECK constraints (progress 0 to 100; endDate not before startDate; DONE is exactly 100 and NOT_STARTED
+// exactly 0). createdById is NULL for an item the system made, and when the user is gone.
+model WorkItem {
+  id            String         @id @default(uuid())
+  villaId       String
+  elecPhaseId   String
+  status        WorkStatus     @default(NOT_STARTED)
+  priority      Priority       @default(MEDIUM)
+  progress      Int            @default(0) @db.SmallInt
+  contractorId  String?
+  startDate     DateTime?      @db.Date
+  endDate       DateTime?      @db.Date
+  source        WorkItemSource
+  version       Int            @default(1)
+  createdById   String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  villa         Villa          @relation(fields: [villaId], references: [id], onDelete: Cascade)
+  elecPhase     ElecPhase      @relation(fields: [elecPhaseId], references: [id], onDelete: Restrict)
+  contractor    Contractor?    @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  createdBy     User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  notifications Notification[]
+
+  @@index([villaId, status])
+  @@index([status])
+  @@index([endDate])
+  @@index([contractorId])
+  @@index([elecPhaseId])
+  @@index([createdById])
+}
+
+// The report of one day's work of one contractor. One report per contractor per day: the real UNIQUE index
+// "DailyReport_contractorId_reportDate_key" decides, even in a race. There is no villa: a report belongs to the contractor
+// and to the electrical engineer who prepared it. Both are required, ACTIVE when they are set (the service checks that), and
+// can be changed; the date can be moved. Written in SQL, because Prisma cannot declare them: the CHECK constraints
+// (workersCount 0..100000; notes, when set, 1..5000 characters) and the trigram index on "notes". createdById is NULL when
+// the user is gone (SET NULL).
+model DailyReport {
+  id                   String             @id @default(uuid())
+  reportDate           DateTime           @db.Date
+  weather              Weather
+  workersCount         Int
+  notes                String?
+  contractorId         String
+  preparedByEngineerId String
+  createdById          String?
+  version              Int                @default(1)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  contractor           Contractor         @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  preparedByEngineer   ElectricalEngineer @relation(fields: [preparedByEngineerId], references: [id], onDelete: Restrict)
+  createdBy            User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([contractorId, reportDate])
+  @@index([reportDate])
+  @@index([preparedByEngineerId])
+  @@index([createdById])
+  @@index([notes(ops: raw("gin_trgm_ops"))], type: Gin, map: "DailyReport_notes_trgm_idx")
+}
+
+// A small job done on a villa by a contractor, planned for a range of days (startDate to endDate, both DATE). There is no
+// natural key: the same text may be written twice, so the only guard against doing it twice is the import's file hash. The
+// villa is fixed once the row exists; the contractor and the dates can be changed. The contractor is required and may be any
+// ACTIVE contractor, not only the villa's own. Written in SQL, because Prisma cannot declare them: the CHECK constraints
+// (description 1..500, endDate on or after startDate) and the trigram index on "description". There is no quantity or unit.
+// createdById is NULL when the user is
+// gone (SET NULL). Whether a PENDING work is overdue or due soon is derived from endDate and the clock, never stored.
+model DailySmallWork {
+  id            String          @id @default(uuid())
+  villaId       String
+  contractorId  String
+  startDate     DateTime        @db.Date
+  endDate       DateTime        @db.Date
+  description   String
+  status        SmallWorkStatus @default(PENDING)
+  createdById   String?
+  version       Int             @default(1)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  villa         Villa           @relation(fields: [villaId], references: [id], onDelete: Restrict)
+  contractor    Contractor      @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  createdBy     User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  notifications Notification[]
+
+  @@index([villaId, endDate(sort: Desc)])
+  @@index([endDate])
+  @@index([contractorId])
+  @@index([createdById])
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "DailySmallWork_description_trgm_idx")
+}
+
+// What kind of alert a notification raises about a small work.
+enum NotificationKind {
+  SMALL_WORK_DUE_SOON
+  SMALL_WORK_OVERDUE
+  OPEN_WORK_OVERDUE
+}
+
+// One alert about one situation of a small work: the work, the kind and the endDate it was raised for. The unique key makes the
+// hourly job safe to rerun and to race: a second insert of the same situation does nothing. Moving the endDate is a new
+// situation (the old row stays as history). "data" is the text of the alert as it was (villa number, description, contractor
+// name, end date), so history does not change when the work is edited. "emailedAt" is set once the digest email that lists it
+// has been sent; NULL means it still has to be. Deleted with its small work. Who sees it is in NotificationRecipient.
+// About exactly one thing: a small work or an open work (a CHECK constraint keeps one of the two set).
+model Notification {
+  id          String                  @id @default(uuid())
+  kind        NotificationKind
+  smallWorkId String?
+  workItemId  String?
+  endDate     DateTime                @db.Date
+  data        Json
+  emailedAt   DateTime?
+  createdAt   DateTime                @default(now())
+  smallWork   DailySmallWork?         @relation(fields: [smallWorkId], references: [id], onDelete: Cascade)
+  workItem    WorkItem?               @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  recipients  NotificationRecipient[]
+
+  @@unique([smallWorkId, kind, endDate])
+  @@unique([workItemId, kind, endDate])
+  @@index([createdAt])
+}
+
+// The copy of a notification one user sees, with that user's own read state. Deleted with the notification or the user.
+model NotificationRecipient {
+  notificationId String
+  userId         String
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([notificationId, userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+}
+
+// A visit to a villa: what the inspector saw and what should be done about it. There is no natural key (two visits on one
+// day with the same title are both valid), so the only guard against doing an import twice is the file hash. The villa is
+// fixed once the row exists; the date can be moved. Written in SQL, because Prisma cannot declare them: the CHECK constraints
+// (rating 1..5, title 1..150, inspector 1..100, findings 1..5000, recommendations null or 1..5000) and the trigram index on
+// "title". "rating" is a SMALLINT; "recommendations" is the only optional text (blank is stored as NULL). createdById is
+// NULL when the user is gone (SET NULL). There is no contractor or engineer: "inspector" is free text.
+model SiteReport {
+  id              String         @id @default(uuid())
+  villaId         String
+  title           String
+  visitDate       DateTime       @db.Date
+  inspector       String
+  type            SiteReportType
+  rating          Int            @db.SmallInt
+  findings        String
+  recommendations String?
+  createdById     String?
+  version         Int            @default(1)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  villa           Villa          @relation(fields: [villaId], references: [id], onDelete: Restrict)
+  createdBy       User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([villaId, visitDate(sort: Desc)])
+  @@index([visitDate])
+  @@index([createdById])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "SiteReport_title_trgm_idx")
+}
+
+// The workers a contractor had on a villa on one day. The natural key is (villa, contractor, day): the same contractor
+// cannot be written twice for a villa on one day (the API answers 409 DAILY_LABOUR_EXISTS, the import reports a duplicate).
+// The villa is fixed once the row exists; the contractor and the day can be moved. The contractor is required and must be the
+// villa's own (checked in the service). Written in SQL, because Prisma cannot declare them: the CHECK constraints
+// (labourCount 0..100000, notes null or 1..500). createdById is NULL when the user is gone (SET NULL).
+model DailyLabour {
+  id           String     @id @default(uuid())
+  villaId      String
+  labourDate   DateTime   @db.Date
+  contractorId String
+  labourCount  Int
+  notes        String?
+  createdById  String?
+  version      Int        @default(1)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  villa        Villa      @relation(fields: [villaId], references: [id], onDelete: Restrict)
+  contractor   Contractor @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  createdBy    User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([villaId, contractorId, labourDate])
+  @@index([villaId, labourDate(sort: Desc)])
+  @@index([labourDate])
+  @@index([contractorId])
+  @@index([createdById])
+}
+
+model VillaDocument {
+  id           String   @id @default(uuid())
+  villaId      String
+  storageKey   String   @unique
+  originalName String
+  sizeBytes    Int
+  mimeType     String
+  uploadedById String
+  createdAt    DateTime @default(now())
+  villa        Villa    @relation(fields: [villaId], references: [id], onDelete: Cascade)
+  uploadedBy   User     @relation("DocumentUploader", fields: [uploadedById], references: [id])
+
+  @@index([villaId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  userAgent String?
+  requestId String?
+  createdAt DateTime @default(now())
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+// One row per file that was imported (see src/core/imports). It is what makes the same file, imported twice, an error:
+// the pair (entity, fileHash) is unique. Dry runs and failed imports leave nothing here. The user is deleted later
+// without deleting the row (SET NULL). "rows" is checked to be 0 or more by a CHECK constraint written in SQL.
+model ImportBatch {
+  id        String   @id @default(uuid())
+  entity    String
+  fileHash  String
+  userId    String?
+  rows      Int
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([entity, fileHash])
+  @@index([userId])
+}
+
+// One row per (user, Idempotency-Key). The request itself is never stored, only an HMAC of it; the response is
+// stored once the request has succeeded. Rows are good for 24 hours (see docs/write-safety.md).
+model IdempotencyKey {
+  id             String            @id @default(uuid())
+  key            String
+  userId         String
+  method         String
+  path           String
+  requestHash    String
+  status         IdempotencyStatus @default(IN_PROGRESS)
+  responseStatus Int?
+  responseBody   Json?
+  createdAt      DateTime          @default(now())
+  expiresAt      DateTime
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@index([expiresAt])
+}
