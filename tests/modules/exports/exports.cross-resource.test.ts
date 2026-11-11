@@ -459,10 +459,10 @@ beforeEach(async () => {
 });
 
 describe.each(CASES)("$name: the file", (c) => {
-  it("is named asico-<what>-<UTC day>.xlsx, with a spreadsheet's content type", async () => {
+  it("is named elecico-<what>-<UTC day>.xlsx, with a spreadsheet's content type", async () => {
     const file = await c.run(service(), "xlsx");
 
-    expect(file.filename).toBe(`asico-${c.stem}-2026-10-12.xlsx`);
+    expect(file.filename).toBe(`elecico-${c.stem}-2026-10-12.xlsx`);
     expect(file.contentType).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   });
 
@@ -476,10 +476,10 @@ describe.each(CASES)("$name: the file", (c) => {
     expect(sheet.name).not.toMatch(/[\\/?*[\]:]/);
   });
 
-  it("is made by Asico, and writes every row of the list under its header", () => {
+  it("is made by Elecico, and writes every row of the list under its header", () => {
     const { workbook, rows, sheet, headerRow } = exported[c.name]!;
 
-    expect(workbook.creator).toBe("Asico");
+    expect(workbook.creator).toBe("Elecico");
     expect(rows).toBe(4);
     expect(sheet.rowCount).toBe(headerRow + 4);
   });
@@ -701,7 +701,7 @@ describe("the PDF of each export", () => {
       const { pages } = await readPdf(bytes);
       const text = pages.flat().join(" ");
 
-      expect(file.filename).toBe(`asico-${c.stem}-2026-10-12.pdf`);
+      expect(file.filename).toBe(`elecico-${c.stem}-2026-10-12.pdf`);
       expect(file.contentType).toBe("application/pdf");
       expect(text).toContain(c.names.title);
       for (const title of titles.filter((title) => !XLSX_ONLY.has(title))) {

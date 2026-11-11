@@ -425,7 +425,7 @@ describe("GET /small-works/export: the audit entry and the allowance", () => {
   it("names the file after the export", async () => {
     const res = await download("/small-works/export?format=xlsx");
 
-    expect(res.headers["content-disposition"]).toMatch(/asico-small-works-\d{4}-\d{2}-\d{2}\.xlsx/);
+    expect(res.headers["content-disposition"]).toMatch(/elecico-small-works-\d{4}-\d{2}-\d{2}\.xlsx/);
   });
 
   it("leaves the table untouched", async () => {

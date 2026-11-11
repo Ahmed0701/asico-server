@@ -36,7 +36,7 @@ describe.each(["en", "ar"] as const)("the reset password email (%s)", (locale) =
     const expiry = dictionary["mail.resetPassword.expiry"].replace("{minutes}", "45");
 
     expect(html).toContain(dictionary["mail.resetPassword.title"]);
-    expect(html).toContain(">Asico</td>");
+    expect(html).toContain(">Elecico</td>");
     expect(html).toContain(expiry);
     expect(text).toContain(expiry);
     expect(html).toContain(dictionary["mail.footer"]);

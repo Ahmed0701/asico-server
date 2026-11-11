@@ -97,7 +97,7 @@ function choicesOf(spec: TemplateSpec): Choices[] {
 // first sheet is read; the hidden Lists sheet holds the choices and comes last.
 export async function buildTemplate(spec: TemplateSpec): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Asico";
+  workbook.creator = "Elecico";
   const choices = choicesOf(spec);
   const data = workbook.addWorksheet(spec.sheetName, { views: [{ state: "frozen", ySplit: 1 }] });
   // ExcelJS has no typed access to a sheet's validations. A rule given for a range is written as it is; one given cell by cell

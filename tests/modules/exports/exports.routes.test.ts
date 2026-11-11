@@ -520,7 +520,7 @@ describe("response headers", () => {
         expect(res.status).toBe(200);
         expect(res.headers["content-type"]).toBe(types[format]);
         expect(res.headers["content-disposition"]).toBe(
-          `attachment; filename="asico-${stem}-${todayUtc()}.${format}"`,
+          `attachment; filename="elecico-${stem}-${todayUtc()}.${format}"`,
         );
         expect(res.headers["cache-control"]).toBe("private, no-store");
         expect(res.headers["content-language"]).toBe("en");

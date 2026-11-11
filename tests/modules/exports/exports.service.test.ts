@@ -512,20 +512,20 @@ describe("the document handed to the writer", () => {
     expect(pdf.s.pdf.write).toHaveBeenCalledTimes(1);
     expect(xlsx.file).toMatchObject({
       contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      filename: "asico-villas-2026-10-12.xlsx",
+      filename: "elecico-villas-2026-10-12.xlsx",
     });
     expect(pdf.file).toMatchObject({
       contentType: "application/pdf",
-      filename: "asico-villas-2026-10-12.pdf",
+      filename: "elecico-villas-2026-10-12.pdf",
     });
   });
 
   it.each([
-    [0, "asico-villas-2026-10-12", "Villas"],
-    [1, "asico-contractors-2026-10-12", "Contractors"],
-    [2, "asico-civil-engineers-2026-10-12", "Civil Engineers"],
-    [3, "asico-contractor-summary-2026-10-12", "Contractor Summary"],
-    [4, "asico-audit-logs-2026-10-12", "Audit Log"],
+    [0, "elecico-villas-2026-10-12", "Villas"],
+    [1, "elecico-contractors-2026-10-12", "Contractors"],
+    [2, "elecico-civil-engineers-2026-10-12", "Civil Engineers"],
+    [3, "elecico-contractor-summary-2026-10-12", "Contractor Summary"],
+    [4, "elecico-audit-logs-2026-10-12", "Audit Log"],
   ])("export %i: file name %s, title %s", async (index, stem, title) => {
     const { file, captured } = await documentOf(runners[index]![1]);
 
@@ -801,10 +801,10 @@ describe("the document handed to the writer", () => {
     expect(captured.rows[1]).toMatchObject({ city: "Giza", villaCount: 2 });
   });
 
-  it("the areas export is called Areas and its file asico-areas-<date>", async () => {
+  it("the areas export is called Areas and its file elecico-areas-<date>", async () => {
     const { file, captured } = await documentOf(runners[6]![1]);
 
-    expect(file.filename).toBe("asico-areas-2026-10-12.xlsx");
+    expect(file.filename).toBe("elecico-areas-2026-10-12.xlsx");
     expect(captured.document.title).toBe("Areas");
     expect(captured.document.sheetName).toBe("Areas");
   });

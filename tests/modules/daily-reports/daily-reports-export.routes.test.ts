@@ -479,7 +479,7 @@ describe("GET /daily-reports/export: the audit entry and the allowance", () => {
   it("names the file after the export", async () => {
     const res = await download("/daily-reports/export?format=xlsx");
 
-    expect(res.headers["content-disposition"]).toMatch(/asico-daily-reports-\d{4}-\d{2}-\d{2}\.xlsx/);
+    expect(res.headers["content-disposition"]).toMatch(/elecico-daily-reports-\d{4}-\d{2}-\d{2}\.xlsx/);
   });
 });
 

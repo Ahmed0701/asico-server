@@ -566,7 +566,7 @@ export class MaterialsTransferService {
     };
     const writer = this.writers[spec.format];
     return {
-      filename: `asico-${spec.file}-${formatDate(generatedAt)}.${spec.format}`,
+      filename: `elecico-${spec.file}-${formatDate(generatedAt)}.${spec.format}`,
       contentType: CONTENT_TYPES[spec.format],
       write: (out: Parameters<ExportWriter>[1]) => writer(document, out),
     };

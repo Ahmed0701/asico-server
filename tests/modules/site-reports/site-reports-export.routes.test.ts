@@ -455,7 +455,7 @@ describe("GET /site-reports/export: the audit entry and the allowance", () => {
   it("names the file after the export", async () => {
     const res = await download("/site-reports/export?format=xlsx");
 
-    expect(res.headers["content-disposition"]).toMatch(/asico-site-reports-\d{4}-\d{2}-\d{2}\.xlsx/);
+    expect(res.headers["content-disposition"]).toMatch(/elecico-site-reports-\d{4}-\d{2}-\d{2}\.xlsx/);
   });
 
   it("leaves the table untouched", async () => {

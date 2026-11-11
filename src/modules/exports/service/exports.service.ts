@@ -921,7 +921,7 @@ export class ExportsService {
     };
     const writer = this.writers[format];
     return {
-      filename: `asico-${definition.names.file}-${formatDate(generatedAt)}.${format}`,
+      filename: `elecico-${definition.names.file}-${formatDate(generatedAt)}.${format}`,
       contentType: CONTENT_TYPES[format],
       write: (out) => writer(document, out),
     };

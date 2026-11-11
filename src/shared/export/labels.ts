@@ -2,7 +2,7 @@
 // asked for, so none of this goes through the translation files.
 
 export const REPORT = {
-  brand: "Asico",
+  brand: "Elecico",
   generated: "Generated",
   filters: "Filters",
   noFilters: "None (all records)",

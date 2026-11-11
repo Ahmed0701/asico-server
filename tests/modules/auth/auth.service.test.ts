@@ -453,7 +453,7 @@ describe("forgotPassword", () => {
   });
 
   it.each([
-    ["en", ctx, /Reset your Asico password/],
+    ["en", ctx, /Reset your Elecico password/],
     ["ar", ctxAr, /إعادة تعيين كلمة المرور/],
   ])("writes the email in the language of the request (%s)", async (_label, context, subject) => {
     repo.findUserByEmail.mockResolvedValue(makeUser());

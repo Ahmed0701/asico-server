@@ -13,7 +13,7 @@ GET /api/v1/daily-reports/export?format=xlsx&contractorId=…&reportFrom=2026-01
 - **`format`** is `xlsx` or `pdf`, and is required (`400 VALIDATION_ERROR` otherwise).
 - **The filters and the sort are those of the list** (see [frontend-contract.md](frontend-contract.md)), checked by the list's own schema, so an export of "what is on screen" is the same query without the paging. `page` and `limit` are refused (400): an export is never a page.
 - **At most 10,000 records.** More answers `422 EXPORT_TOO_LARGE` before any file is made: narrow the filters.
-- **The file** is named `asico-<file>-<YYYY-MM-DD>.<format>` (the day is the UTC day), sent as an attachment with `Cache-Control: private, no-store`.
+- **The file** is named `elecico-<file>-<YYYY-MM-DD>.<format>` (the day is the UTC day), sent as an attachment with `Cache-Control: private, no-store`.
 - **The file is in English**, whatever `Accept-Language` says (`Content-Language: en`); error messages still follow the request. The audit export writes the action and entity labels, not their codes.
 - **Dates and times are UTC.** A column of times is headed `(UTC)`. A text column stays text in a workbook, so a phone number or a villa number keeps its leading zeros. Column widths fit the content, in both formats; a PDF lists the filters that were applied above the table.
 - **Every export writes an audit entry** (`export.<name>`) before the file is made, so it leaves a trace whatever happens to the download. It holds the format, the filters and the number of records, never the rows.

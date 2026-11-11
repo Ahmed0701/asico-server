@@ -154,7 +154,7 @@ export const envSchema = z
         .string()
         .refine(
           (value) => !HAS_LINE_BREAK.test(value) && mailAddressOf(value) !== undefined,
-          'must be an address such as "Asico <you@gmail.com>"',
+          'must be an address such as "Elecico <you@gmail.com>"',
         )
         .optional(),
     ),

@@ -168,7 +168,7 @@ export const writeXlsx: ExportWriter = async (document: ExportDocument, out: Wri
     useStyles: true,
     useSharedStrings: false,
   });
-  workbook.creator = "Asico";
+  workbook.creator = "Elecico";
   workbook.created = document.generatedAt;
 
   // The summary, a blank row, then the header: the header row is the one that stays in view.

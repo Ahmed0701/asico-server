@@ -215,7 +215,7 @@ describe("sendResetEmail", () => {
     await expect(sendResetEmail(email, mailer)).resolves.toBe(true);
 
     expect(mailer.sent).toHaveLength(1);
-    expect(mailer.sent[0]).toMatchObject({ to: "sara@example.test", subject: "Reset your Asico password" });
+    expect(mailer.sent[0]).toMatchObject({ to: "sara@example.test", subject: "Reset your Elecico password" });
     expect(mailer.sent[0]?.html).toContain("https://app.example.test/reset-password?token=TOKEN-123");
     expect(mailer.sent[0]?.text).toContain("https://app.example.test/reset-password?token=TOKEN-123");
     expect(mailer.sent[0]?.text).toContain("30 minutes");

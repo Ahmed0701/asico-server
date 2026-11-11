@@ -156,7 +156,7 @@ export async function exportFiles(): Promise<ExportFile[]> {
     const headers = (sheet.getRow(headerRow).values as ExcelJS.CellValue[]).slice(1).map(String);
     found.push({
       route: entry.route,
-      fileStem: /^asico-(.*)-\d{4}-\d{2}-\d{2}\.xlsx$/.exec(file.filename)?.[1] ?? file.filename,
+      fileStem: /^elecico-(.*)-\d{4}-\d{2}-\d{2}\.xlsx$/.exec(file.filename)?.[1] ?? file.filename,
       sheet: sheet.name,
       headers,
     });

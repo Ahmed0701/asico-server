@@ -414,7 +414,7 @@ describe("GET /daily-labour/export: the audit entry and the allowance", () => {
   it("names the file after the export", async () => {
     const res = await download("/daily-labour/export?format=xlsx");
 
-    expect(res.headers["content-disposition"]).toMatch(/asico-daily-labour-\d{4}-\d{2}-\d{2}\.xlsx/);
+    expect(res.headers["content-disposition"]).toMatch(/elecico-daily-labour-\d{4}-\d{2}-\d{2}\.xlsx/);
   });
 
   it("exports nothing it does not have: the table is untouched by an export", async () => {

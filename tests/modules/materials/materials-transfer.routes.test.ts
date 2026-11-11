@@ -158,7 +158,7 @@ describe("GET /material-deliveries/export", () => {
     const rows = await tableOf(res);
 
     expect(res.headers["content-disposition"]).toMatch(
-      /^attachment; filename="asico-material-deliveries-\d{4}-\d{2}-\d{2}\.xlsx"$/,
+      /^attachment; filename="elecico-material-deliveries-\d{4}-\d{2}-\d{2}\.xlsx"$/,
     );
     expect(Object.keys(rows[0]!)).toEqual([
       ...HEADER,

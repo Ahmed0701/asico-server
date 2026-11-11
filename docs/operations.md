@@ -67,7 +67,7 @@ A blank value (`SMTP_PORT=`) means "not set".
 | `SMTP_SECURE`                    | unset                                  | `true` or `false`.                                                                                                                                                                                                                                                                                                 |
 | `SMTP_USER`                      | unset                                  | The account (for Gmail, the address).                                                                                                                                                                                                                                                                              |
 | `SMTP_PASS`                      | unset                                  | The password (for Gmail, an App Password: 16 characters, no spaces).                                                                                                                                                                                                                                               |
-| `MAIL_FROM`                      | unset                                  | `"Asico <you@example.com>"`. With Gmail it must be the `SMTP_USER` address.                                                                                                                                                                                                                                        |
+| `MAIL_FROM`                      | unset                                  | `"Elecico <you@example.com>"`. With Gmail it must be the `SMTP_USER` address.                                                                                                                                                                                                                                      |
 
 Also read, but not part of the application's schema:
 
@@ -175,10 +175,10 @@ The frontend must ship with this release (the API shapes of open works, daily re
 **Backup.** The state is the database and `UPLOAD_DIR`. Back both up together (the documents are rows plus files):
 
 ```bash
-pg_dump --format=custom --file=asico-$(date +%F).dump "$DATABASE_URL"
+pg_dump --format=custom --file=elecico-$(date +%F).dump "$DATABASE_URL"
 ```
 
-and restore into an empty database with `pg_restore --clean --if-exists --dbname=<url> asico-<date>.dump`. Test a restore before you need one.
+and restore into an empty database with `pg_restore --clean --if-exists --dbname=<url> elecico-<date>.dump`. Test a restore before you need one.
 
 ## Docker
 
@@ -210,7 +210,7 @@ and any limit or timeout you want to change from its default.
 Password reset links are sent by email (`POST /auth/forgot-password`, and `POST /users/:id/reset-password` for an administrator). Set the six SMTP variables (see the table above); in production the app does not start without them. For Gmail:
 
 - Use an **App Password**, not the account password. App Passwords require **2-Step Verification** to be on for the Google account (Google Account → Security → App passwords). The password is 16 characters; enter it without spaces.
-- `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465` with `SMTP_SECURE=true` (or `587` with `SMTP_SECURE=false`, which uses STARTTLS), `SMTP_USER` is the Gmail address, and `MAIL_FROM="Asico <the same address>"`. Gmail rewrites any other From address, so `MAIL_FROM` must be the authenticated account.
+- `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465` with `SMTP_SECURE=true` (or `587` with `SMTP_SECURE=false`, which uses STARTTLS), `SMTP_USER` is the Gmail address, and `MAIL_FROM="Elecico <the same address>"`. Gmail rewrites any other From address, so `MAIL_FROM` must be the authenticated account.
 - Gmail limits sending to roughly 500 emails a day, which is enough for this internal system. The forgot-password endpoint also sends at most one email a minute per user.
 - Without SMTP in development, the email is written to `asico-mail-outbox` in the system temp folder and only the file path is logged. Neither the link nor `SMTP_PASS` is ever written to the log.
 - `npm run mail:preview` renders the email in English and Arabic into `asico-mail-preview` in the system temp folder, to open in a browser.

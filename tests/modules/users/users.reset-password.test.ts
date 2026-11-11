@@ -92,7 +92,10 @@ describe("POST /users/:id/reset-password", () => {
       data: { message: "A password reset link was sent to the user and their sessions were signed out." },
     });
     expect(mailbox.sent).toHaveLength(1);
-    expect(mailbox.sent[0]).toMatchObject({ to: "sara@example.test", subject: "Reset your Asico password" });
+    expect(mailbox.sent[0]).toMatchObject({
+      to: "sara@example.test",
+      subject: "Reset your Elecico password",
+    });
     expect(mailbox.sent[0]?.html).toContain("An administrator has started a password reset");
     expect(mailbox.sent[0]?.html).toContain("Sara");
 
@@ -147,7 +150,7 @@ describe("POST /users/:id/reset-password", () => {
       "تم إرسال رابط إعادة تعيين كلمة المرور إلى المستخدم وتم تسجيل خروجه من جميع جلساته.",
     );
     expect(mailbox.sent[0]?.html).toContain('dir="rtl"');
-    expect(mailbox.sent[0]?.subject).toBe("إعادة تعيين كلمة المرور في أسيكو");
+    expect(mailbox.sent[0]?.subject).toBe("إعادة تعيين كلمة المرور في Elecico");
   });
 
   it("a second reset voids the first link, and the administrator is not held to the one-a-minute cooldown", async () => {
