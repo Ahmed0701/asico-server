@@ -7,6 +7,8 @@ dist
 .env
 # .env.*
 # .env.example
+# Production secrets on the server; the example next to it is tracked
+deploy/.env.production
 
 # Logs
 logs
