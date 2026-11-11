@@ -100,6 +100,9 @@ const notMewFollowUp = (ctx: RequestContext): AppError =>
   fail(ctx, 409, "errors.villaNotMewFollowUp", "VILLA_NOT_MEW_FOLLOW_UP");
 const alreadyMewInspection = (ctx: RequestContext): AppError =>
   fail(ctx, 409, "errors.villaAlreadyMewInspection", "VILLA_ALREADY_MEW_INSPECTION");
+// MEW inspects a villa only after both files went in: the AC and the electricity MEW states must be past NOT_SUBMITTED.
+const mewNotSubmitted = (ctx: RequestContext): AppError =>
+  fail(ctx, 409, "errors.villaMewNotSubmitted", "VILLA_MEW_NOT_SUBMITTED");
 const notMewInspection = (ctx: RequestContext): AppError =>
   fail(ctx, 409, "errors.villaNotMewInspection", "VILLA_NOT_MEW_INSPECTION");
 const alreadyMewInspectionPassed = (ctx: RequestContext): AppError =>
@@ -458,6 +461,12 @@ export class VillasService {
         }
         if (on === (current.at !== null)) {
           throw on ? rules.already(ctx) : rules.missing(ctx);
+        }
+        if (mark === "mewInspection" && on) {
+          const states = await this.repository.findMewStates(id, tx);
+          if (states && (states.mewAcState === "NOT_SUBMITTED" || states.mewElecState === "NOT_SUBMITTED")) {
+            throw mewNotSubmitted(ctx);
+          }
         }
 
         const value = on ? { at: new Date(), byId: actor.id } : null;

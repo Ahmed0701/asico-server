@@ -158,25 +158,25 @@ Deliveries from the switchgear and cable factories to the villas, each with its 
 
 ### Villas
 
-| Method   | Path                                   | Access              | Idempotency-Key | If-Match | Purpose                                                                    |
-| -------- | -------------------------------------- | ------------------- | --------------- | -------- | -------------------------------------------------------------------------- |
-| `GET`    | `/villas`                              | `villas:read`       | —               | —        | List villas (page, filters, sort)                                          |
-| `GET`    | `/villas/options`                      | `villas:read`       | —               | —        | Id and villa number of every villa, for a picker                           |
-| `GET`    | `/villas/filters`                      | `villas:read`       | —               | —        | The areas and blocks the villa filters offer                               |
-| `GET`    | `/villas/import/template`              | `villas:import`     | —               | —        | The empty villas import file, with an example row                          |
-| `POST`   | `/villas/import`                       | `villas:import`     | required        | —        | Import villas from a spreadsheet (`?dryRun=true` only checks)              |
-| `GET`    | `/villas/:id`                          | `villas:detail`     | —               | —        | One villa in full: its parties, its phases and their progress              |
-| `POST`   | `/villas`                              | `villas:create`     | optional        | —        | Create a villa                                                             |
-| `PATCH`  | `/villas/:id`                          | `villas:update`     | —               | optional | Change a villa                                                             |
-| `POST`   | `/villas/:id/mew-follow-up`            | `villas:inspection` | optional        | optional | Put a villa on MEW follow up (409 if it already is)                        |
-| `DELETE` | `/villas/:id/mew-follow-up`            | `villas:inspection` | optional        | optional | Take a villa off MEW follow up (409 if it is not on it)                    |
-| `POST`   | `/villas/:id/mew-inspection`           | `villas:inspection` | optional        | optional | Put a villa on MEW inspection (409 if it already is)                       |
-| `DELETE` | `/villas/:id/mew-inspection`           | `villas:inspection` | optional        | optional | Take a villa off MEW inspection (409 if it is not on it)                   |
-| `POST`   | `/villas/:id/mew-inspection-passed`    | `villas:inspection` | optional        | optional | Check a villa as passed MEW inspection (409 if it already is)              |
-| `DELETE` | `/villas/:id/mew-inspection-passed`    | `villas:inspection` | optional        | optional | Take back a passed MEW inspection (409 if it is not passed)                |
-| `PATCH`  | `/villas/:id/mew-states`               | `villas:inspection` | —               | optional | Set the villa's MEW AC state, MEW electricity state and MEW inspection day |
-| `DELETE` | `/villas/:id`                          | `villas:delete`     | —               | optional | Delete a villa                                                             |
-| `PATCH`  | `/villas/:villaId/phases/:elecPhaseId` | `villas:progress`   | optional        | optional | Set the progress of one phase of one villa                                 |
+| Method   | Path                                   | Access              | Idempotency-Key | If-Match | Purpose                                                                                                   |
+| -------- | -------------------------------------- | ------------------- | --------------- | -------- | --------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/villas`                              | `villas:read`       | —               | —        | List villas (page, filters, sort)                                                                         |
+| `GET`    | `/villas/options`                      | `villas:read`       | —               | —        | Id and villa number of every villa, for a picker                                                          |
+| `GET`    | `/villas/filters`                      | `villas:read`       | —               | —        | The areas and blocks the villa filters offer                                                              |
+| `GET`    | `/villas/import/template`              | `villas:import`     | —               | —        | The empty villas import file, with an example row                                                         |
+| `POST`   | `/villas/import`                       | `villas:import`     | required        | —        | Import villas from a spreadsheet (`?dryRun=true` only checks)                                             |
+| `GET`    | `/villas/:id`                          | `villas:detail`     | —               | —        | One villa in full: its parties, its phases and their progress                                             |
+| `POST`   | `/villas`                              | `villas:create`     | optional        | —        | Create a villa                                                                                            |
+| `PATCH`  | `/villas/:id`                          | `villas:update`     | —               | optional | Change a villa                                                                                            |
+| `POST`   | `/villas/:id/mew-follow-up`            | `villas:inspection` | optional        | optional | Put a villa on MEW follow up (409 if it already is)                                                       |
+| `DELETE` | `/villas/:id/mew-follow-up`            | `villas:inspection` | optional        | optional | Take a villa off MEW follow up (409 if it is not on it)                                                   |
+| `POST`   | `/villas/:id/mew-inspection`           | `villas:inspection` | optional        | optional | Put a villa on MEW inspection (409 if it already is, or its AC or electricity MEW state is NOT_SUBMITTED) |
+| `DELETE` | `/villas/:id/mew-inspection`           | `villas:inspection` | optional        | optional | Take a villa off MEW inspection (409 if it is not on it)                                                  |
+| `POST`   | `/villas/:id/mew-inspection-passed`    | `villas:inspection` | optional        | optional | Check a villa as passed MEW inspection (409 if it already is)                                             |
+| `DELETE` | `/villas/:id/mew-inspection-passed`    | `villas:inspection` | optional        | optional | Take back a passed MEW inspection (409 if it is not passed)                                               |
+| `PATCH`  | `/villas/:id/mew-states`               | `villas:inspection` | —               | optional | Set the villa's MEW AC state, MEW electricity state and MEW inspection day                                |
+| `DELETE` | `/villas/:id`                          | `villas:delete`     | —               | optional | Delete a villa                                                                                            |
+| `PATCH`  | `/villas/:villaId/phases/:elecPhaseId` | `villas:progress`   | optional        | optional | Set the progress of one phase of one villa                                                                |
 
 ### Villa documents
 

@@ -65,6 +65,8 @@ const send = async (verb: Verb, path: string, options: Options = {}) => {
   return options.body === undefined ? req : req.send(options.body as object);
 };
 const live = (): StoredVilla => villaTables.villas.find((candidate) => candidate.id === villa.id)!;
+// Both MEW files went in: a villa can be added for MEW inspection only then.
+const submitted = { mewAcState: "RUNNING", mewElecState: "RUNNING" } as const;
 const auditRows = () => store.auditRows as unknown as Record<string, unknown>[];
 
 // [name, path, field in the answer, audit action, code when it is already on, code when it is not on]
@@ -95,6 +97,9 @@ describe.each([
   ],
 ] as const)("the %s mark", (_name, path, field, action, alreadyCode, notCode) => {
   const url = () => `/villas/${villa.id}/${path}`;
+  beforeEach(() => {
+    Object.assign(live(), submitted);
+  });
 
   it("is put on by a person, with who and when, and taken off again, each audited", async () => {
     const on = await send("post", url());
@@ -150,7 +155,8 @@ describe.each([
 });
 
 it("moves a villa that passed off the MEW inspection list and onto the passed list, and back when it is taken back", async () => {
-  const other = addVilla({ villaNumber: "P-002" });
+  const other = addVilla({ villaNumber: "P-002", ...submitted });
+  Object.assign(live(), submitted);
   await send("post", `/villas/${villa.id}/mew-inspection`);
   await send("post", `/villas/${other.id}/mew-inspection`);
 
@@ -172,6 +178,7 @@ it("moves a villa that passed off the MEW inspection list and onto the passed li
 });
 
 it("keeps the two marks apart: a villa can be on both lists, and taking one off leaves the other", async () => {
+  Object.assign(live(), submitted);
   await send("post", `/villas/${villa.id}/mew-follow-up`);
   await send("post", `/villas/${villa.id}/mew-inspection`);
   await send("delete", `/villas/${villa.id}/mew-follow-up`);
@@ -180,6 +187,49 @@ it("keeps the two marks apart: a villa can be on both lists, and taking one off 
 
   expect(res.body.data.mewFollowUp).toBeNull();
   expect(res.body.data.mewInspection).not.toBeNull();
+});
+
+describe("adding a villa for MEW inspection before both MEW files are submitted", () => {
+  const url = () => `/villas/${villa.id}/mew-inspection`;
+
+  it.each([
+    ["neither state is submitted", {}],
+    ["the AC state is NOT_SUBMITTED", { mewElecState: "APPROVED" }],
+    ["the electricity state is NOT_SUBMITTED", { mewAcState: "APPROVED" }],
+  ] as const)(
+    "refuses it with 409 VILLA_MEW_NOT_SUBMITTED when %s, and writes nothing",
+    async (_case, states) => {
+      Object.assign(live(), states);
+
+      const res = await send("post", url());
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe("VILLA_MEW_NOT_SUBMITTED");
+      expect(live().mewInspectionAt).toBeNull();
+      expect(live().version).toBe(1);
+      expect(auditRows()).toEqual([]);
+    },
+  );
+
+  it("says why in the request's language", async () => {
+    const en = await send("post", url());
+    const ar = await send("post", url(), { language: "ar" });
+
+    expect(en.body.message).toMatch(/Submit the MEW AC and electricity files/);
+    expect(ar.body.message).toMatch(/التكييف والكهرباء/);
+  });
+
+  it("allows it once both are RUNNING or APPROVED, and the MEW follow-up mark needs neither", async () => {
+    expect((await send("post", `/villas/${villa.id}/mew-follow-up`)).status).toBe(200);
+    await send("patch", `/villas/${villa.id}/mew-states`, {
+      body: { mewAcState: "APPROVED", mewElecState: "RUNNING" },
+    });
+
+    const res = await send("post", url());
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.mewInspection).not.toBeNull();
+  });
 });
 
 describe("PATCH /villas/:id/mew-states", () => {
