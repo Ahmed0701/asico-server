@@ -65,8 +65,8 @@ const send = async (verb: Verb, path: string, options: Options = {}) => {
   return options.body === undefined ? req : req.send(options.body as object);
 };
 const live = (): StoredVilla => villaTables.villas.find((candidate) => candidate.id === villa.id)!;
-// Both MEW files went in: a villa can be added for MEW inspection only then.
-const submitted = { mewAcState: "RUNNING", mewElecState: "RUNNING" } as const;
+// Both MEW files are approved: a villa can be added for MEW inspection only then.
+const submitted = { mewAcState: "APPROVED", mewElecState: "APPROVED" } as const;
 const auditRows = () => store.auditRows as unknown as Record<string, unknown>[];
 
 // [name, path, field in the answer, audit action, code when it is already on, code when it is not on]
@@ -189,22 +189,25 @@ it("keeps the two marks apart: a villa can be on both lists, and taking one off 
   expect(res.body.data.mewInspection).not.toBeNull();
 });
 
-describe("adding a villa for MEW inspection before both MEW files are submitted", () => {
+describe("adding a villa for MEW inspection before both MEW files are approved", () => {
   const url = () => `/villas/${villa.id}/mew-inspection`;
 
   it.each([
     ["neither state is submitted", {}],
+    ["both states are RUNNING", { mewAcState: "RUNNING", mewElecState: "RUNNING" }],
     ["the AC state is NOT_SUBMITTED", { mewElecState: "APPROVED" }],
+    ["the AC state is RUNNING", { mewAcState: "RUNNING", mewElecState: "APPROVED" }],
     ["the electricity state is NOT_SUBMITTED", { mewAcState: "APPROVED" }],
+    ["the electricity state is RUNNING", { mewAcState: "APPROVED", mewElecState: "RUNNING" }],
   ] as const)(
-    "refuses it with 409 VILLA_MEW_NOT_SUBMITTED when %s, and writes nothing",
+    "refuses it with 409 VILLA_MEW_NOT_APPROVED when %s, and writes nothing",
     async (_case, states) => {
       Object.assign(live(), states);
 
       const res = await send("post", url());
 
       expect(res.status).toBe(409);
-      expect(res.body.code).toBe("VILLA_MEW_NOT_SUBMITTED");
+      expect(res.body.code).toBe("VILLA_MEW_NOT_APPROVED");
       expect(live().mewInspectionAt).toBeNull();
       expect(live().version).toBe(1);
       expect(auditRows()).toEqual([]);
@@ -215,14 +218,14 @@ describe("adding a villa for MEW inspection before both MEW files are submitted"
     const en = await send("post", url());
     const ar = await send("post", url(), { language: "ar" });
 
-    expect(en.body.message).toMatch(/Submit the MEW AC and electricity files/);
+    expect(en.body.message).toMatch(/must be Approved/);
     expect(ar.body.message).toMatch(/التكييف والكهرباء/);
   });
 
-  it("allows it once both are RUNNING or APPROVED, and the MEW follow-up mark needs neither", async () => {
+  it("allows it once both are APPROVED, and the MEW follow-up mark needs neither", async () => {
     expect((await send("post", `/villas/${villa.id}/mew-follow-up`)).status).toBe(200);
     await send("patch", `/villas/${villa.id}/mew-states`, {
-      body: { mewAcState: "APPROVED", mewElecState: "RUNNING" },
+      body: { mewAcState: "APPROVED", mewElecState: "APPROVED" },
     });
 
     const res = await send("post", url());

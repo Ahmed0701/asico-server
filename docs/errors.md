@@ -122,7 +122,7 @@ See [write-safety.md](write-safety.md).
 | `VILLA_ALREADY_MEW_FOLLOW_UP`         | 409    | Putting a villa on MEW follow up that is already on it.                                                                             |
 | `VILLA_NOT_MEW_FOLLOW_UP`             | 409    | Taking a villa off MEW follow up that is not on it.                                                                                 |
 | `VILLA_ALREADY_MEW_INSPECTION`        | 409    | Putting a villa on MEW inspection that is already on it.                                                                            |
-| `VILLA_MEW_NOT_SUBMITTED`             | 409    | Putting a villa on MEW inspection while its MEW AC state or MEW electricity state is still `NOT_SUBMITTED`.                         |
+| `VILLA_MEW_NOT_APPROVED`              | 409    | Putting a villa on MEW inspection while its MEW AC state or MEW electricity state is not `APPROVED`.                                |
 | `VILLA_NOT_MEW_INSPECTION`            | 409    | Taking a villa off MEW inspection that is not on it.                                                                                |
 | `VILLA_ALREADY_MEW_INSPECTION_PASSED` | 409    | Checking a villa as passed MEW inspection when it already is.                                                                       |
 | `VILLA_NOT_MEW_INSPECTION_PASSED`     | 409    | Taking back a passed MEW inspection that the villa does not have.                                                                   |

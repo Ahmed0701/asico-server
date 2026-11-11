@@ -131,7 +131,7 @@
   "errors.villaAlreadyMewFollowUp": "This villa is already on the MEW follow-up list",
   "errors.villaNotMewFollowUp": "This villa is not on the MEW follow-up list",
   "errors.villaAlreadyMewInspection": "This villa is already on the MEW inspection list",
-  "errors.villaMewNotSubmitted": "Submit the MEW AC and electricity files before adding the villa for MEW inspection (neither state can be Not Submitted)",
+  "errors.villaMewNotApproved": "Both MEW AC and MEW electricity states must be Approved before adding the villa for MEW inspection",
   "errors.villaNotMewInspection": "This villa is not on the MEW inspection list",
   "errors.villaAlreadyMewInspectionPassed": "This villa has already passed the MEW inspection",
   "errors.villaNotMewInspectionPassed": "This villa has not passed the MEW inspection",

@@ -131,7 +131,7 @@
   "errors.villaAlreadyMewFollowUp": "هذه الفيلا موجودة بالفعل في قائمة متابعة الوزارة (MEW)",
   "errors.villaNotMewFollowUp": "هذه الفيلا ليست في قائمة متابعة الوزارة (MEW)",
   "errors.villaAlreadyMewInspection": "هذه الفيلا موجودة بالفعل في قائمة معاينة الوزارة (MEW)",
-  "errors.villaMewNotSubmitted": "قدّم ملفي التكييف والكهرباء للوزارة (MEW) قبل إضافة الفيلا للمعاينة (يجب ألا تكون أي من الحالتين «لم يُقدَّم»)",
+  "errors.villaMewNotApproved": "يجب أن تكون حالتا التكييف والكهرباء في الوزارة (MEW) «معتمد» قبل إضافة الفيلا للمعاينة",
   "errors.villaNotMewInspection": "هذه الفيلا ليست في قائمة معاينة الوزارة (MEW)",
   "errors.villaAlreadyMewInspectionPassed": "هذه الفيلا اجتازت معاينة الوزارة (MEW) بالفعل",
   "errors.villaNotMewInspectionPassed": "هذه الفيلا لم تجتز معاينة الوزارة (MEW)",
