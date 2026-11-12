@@ -9,6 +9,7 @@
   "errors.internal": "Internal server error",
   "errors.invalidCredentials": "Invalid email or password",
   "errors.accountInactive": "Your account is not active yet",
+  "errors.signupDisabled": "Sign-up is turned off. Ask an administrator to create your account.",
   "errors.emailTaken": "This email is already registered",
   "errors.invalidRefreshToken": "Your session is invalid or has expired",
   "errors.refreshTokenReused": "Your session is no longer valid. Please sign in again",

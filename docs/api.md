@@ -29,17 +29,17 @@ All paths are under `/api/v1`. A test (`tests/docs/routes.docs.test.ts`) reads t
 
 ### Sign-in and account
 
-| Method  | Path                    | Access      | Idempotency-Key | If-Match | Purpose                                                                                                  |
-| ------- | ----------------------- | ----------- | --------------- | -------- | -------------------------------------------------------------------------------------------------------- |
-| `POST`  | `/auth/signup`          | `public`    | —               | —        | Register an account: an EMPLOYEE, inactive until an administrator activates it, so it cannot sign in yet |
-| `POST`  | `/auth/login`           | `public`    | —               | —        | Sign in; returns the access token and sets the refresh cookie                                            |
-| `POST`  | `/auth/refresh`         | `public`    | —               | —        | Exchange the refresh cookie for a new access token (the refresh token rotates)                           |
-| `POST`  | `/auth/logout`          | `public`    | —               | —        | Revoke the refresh token and clear the cookie                                                            |
-| `POST`  | `/auth/forgot-password` | `public`    | —               | —        | Email a reset link (answers the same whether or not the address is known; one email a minute per user)   |
-| `POST`  | `/auth/reset-password`  | `public`    | —               | —        | Set a new password with the emailed token; signs every session out                                       |
-| `POST`  | `/auth/change-password` | `signed in` | —               | —        | Change your own password; every other session is signed out                                              |
-| `GET`   | `/me`                   | `signed in` | —               | —        | Your profile and your permission codes                                                                   |
-| `PATCH` | `/me`                   | `signed in` | —               | —        | Change your own name                                                                                     |
+| Method  | Path                    | Access      | Idempotency-Key | If-Match | Purpose                                                                                                                                                                      |
+| ------- | ----------------------- | ----------- | --------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST`  | `/auth/signup`          | `public`    | —               | —        | Register an account (403 `SIGNUP_DISABLED` when sign-up is off, the production default): an EMPLOYEE, inactive until an administrator activates it, so it cannot sign in yet |
+| `POST`  | `/auth/login`           | `public`    | —               | —        | Sign in; returns the access token and sets the refresh cookie                                                                                                                |
+| `POST`  | `/auth/refresh`         | `public`    | —               | —        | Exchange the refresh cookie for a new access token (the refresh token rotates)                                                                                               |
+| `POST`  | `/auth/logout`          | `public`    | —               | —        | Revoke the refresh token and clear the cookie                                                                                                                                |
+| `POST`  | `/auth/forgot-password` | `public`    | —               | —        | Email a reset link (answers the same whether or not the address is known; one email a minute per user)                                                                       |
+| `POST`  | `/auth/reset-password`  | `public`    | —               | —        | Set a new password with the emailed token; signs every session out                                                                                                           |
+| `POST`  | `/auth/change-password` | `signed in` | —               | —        | Change your own password; every other session is signed out                                                                                                                  |
+| `GET`   | `/me`                   | `signed in` | —               | —        | Your profile and your permission codes                                                                                                                                       |
+| `PATCH` | `/me`                   | `signed in` | —               | —        | Change your own name                                                                                                                                                         |
 
 ### Users and permissions
 

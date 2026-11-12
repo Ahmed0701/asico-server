@@ -1,9 +1,57 @@
-{
-	email {$ACME_EMAIL}
-}
-
-# Caddy gets and renews the HTTPS certificate for the domain by itself.
+# One domain: the static frontend, and /api/* to the API container. Caddy gets and renews the HTTPS certificate.
+# DOMAIN comes from deploy/.env.production (through docker-compose.prod.yml).
 {$DOMAIN} {
 	encode zstd gzip
-	reverse_proxy web:80
+
+	# On every response, the API's included.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		-Server
+	}
+
+	# The API, with its whole /api/v1 path unchanged (the refresh cookie's path is /api/v1/auth).
+	handle /api/* {
+		# Delivery notes: up to 10 files of 25 MB in one request. Everything else: 30 MB (one 25 MB PDF).
+		@deliveryNotes path_regexp ^/api/v1/material-deliveries/[^/]+/notes$
+		@otherApi not path_regexp ^/api/v1/material-deliveries/[^/]+/notes$
+		request_body @deliveryNotes {
+			max_size 260MB
+		}
+		request_body @otherApi {
+			max_size 30MB
+		}
+		reverse_proxy app:8080
+	}
+
+	# The frontend build (FRONTEND_DIST_DIR on the host, mounted read-only).
+	handle {
+		root * /srv/frontend
+
+		# Hashed file names: cache for a year. A missing one is a real 404, never index.html.
+		@assets path /assets/*
+		handle @assets {
+			# Only files that exist: a 404 must not be cached for a year.
+			@assetExists file
+			header @assetExists Cache-Control "public, max-age=31536000, immutable"
+			file_server
+		}
+
+		handle {
+			# Inline styles: Radix and the toasts set style attributes. Fonts: Google Fonts (src/index.css).
+			# blob: for the documents opened in a new tab and the downloads.
+			header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'self' blob:; frame-src 'self' blob:; worker-src 'self' blob:; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+			# Every client route (/villas/123 and so on) gets index.html, which is never cached. "route" keeps this order:
+			# the rewrite first, so the no-store header also reaches the rewritten deep links.
+			route {
+				try_files {path} /index.html
+				@index path / /index.html
+				header @index Cache-Control "no-store"
+				file_server
+			}
+		}
+	}
 }

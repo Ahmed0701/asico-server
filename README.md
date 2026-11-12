@@ -27,6 +27,7 @@ The API listens on `http://localhost:8080` under `/api/v1`. Health check: `GET /
 | [docs/imports-exports.md](docs/imports-exports.md)     | Use the twelve exports and the six spreadsheet imports: columns, limits, the import report.                                                          |
 | [docs/write-safety.md](docs/write-safety.md)           | Retry safely (`Idempotency-Key`) and edit safely (`If-Match`); the rules for future money endpoints.                                                 |
 | [docs/operations.md](docs/operations.md)               | Configure, deploy, back up and watch the service; the rate limits, the UTC day, the load check results.                                              |
+| [docs/deployment.md](docs/deployment.md)               | Deploy to the production server: first install, update, backup, restore, secrets, the Cloudflare proxy.                                              |
 | [docs/testing.md](docs/testing.md)                     | Run the suite, the database tests and the load check; how the documents are tested.                                                                  |
 
 The documents are checked against the code by `npm test` (`tests/docs`): a route, permission, error code, environment variable, export column or DTO field that changes without its document fails the build.

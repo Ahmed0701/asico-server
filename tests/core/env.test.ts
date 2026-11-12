@@ -414,3 +414,25 @@ describe("environment settings of the refresh cookie", () => {
     });
   });
 });
+
+describe("placeholder values copied from an example file", () => {
+  it("refuses any setting that still says CHANGE_ME, naming it", () => {
+    const result = envSchema.safeParse({
+      ...required,
+      JWT_ACCESS_SECRET: "CHANGE_ME_JWT_ACCESS_SECRET_AT_LEAST_32_CHARS",
+      DATABASE_URL: "postgresql://elecico:CHANGE_ME_POSTGRES_PASSWORD@db:5432/elecico",
+    });
+
+    expect(result.success).toBe(false);
+    const issues = result.success ? [] : result.error.issues;
+    expect(issues.map((issue) => issue.path.join(".")).sort()).toEqual(["DATABASE_URL", "JWT_ACCESS_SECRET"]);
+    expect(issues[0]?.message).toBe("is still a placeholder (CHANGE_ME): set the real value");
+  });
+
+  it("matches the marker in any case, and accepts real values", () => {
+    expect(
+      envSchema.safeParse({ ...required, JWT_ACCESS_SECRET: `change_me_${"x".repeat(32)}` }).success,
+    ).toBe(false);
+    expect(envSchema.safeParse(required).success).toBe(true);
+  });
+});

@@ -1,81 +1,90 @@
-# Production: PostgreSQL, the migrations job, the API, the web app (nginx) and Caddy (HTTPS).
-# Expects ../asico-management next to this folder, and a .env made from deploy/env.production.example.
-# Run: docker compose -f docker-compose.prod.yml up -d --build
-name: elecico
+# Production: one server, one domain over HTTPS.
+#   caddy  TLS, the static frontend (FRONTEND_DIST_DIR), and /api/* to the API
+#   app    this API (built from ../Dockerfile), internal port 8080 only
+#   db     PostgreSQL 17, internal only (no published port)
+# Run from this folder (asico-server/deploy):
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+# The scripts in deploy/scripts pass the same two files for you.
+name: asico
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in deploy/.env.production}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env.production}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in deploy/.env.production}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
       timeout: 5s
       retries: 20
-
-  migrate:
-    build:
-      context: .
-      target: migrate
-    env_file: ${ENV_FILE:-.env}
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: "no"
+    logging: *logging
 
   app:
     build:
-      context: .
-      target: runtime
+      context: ..
+      dockerfile: Dockerfile
+    image: asico-app:latest
     restart: unless-stopped
-    env_file: ${ENV_FILE:-.env}
+    env_file:
+      - .env.production
     environment:
       NODE_ENV: production
-      PORT: 8080
-      UPLOAD_DIR: uploads
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      PORT: "8080"
+      # The named volume below; the image creates it owned by the non-root "node" user.
+      UPLOAD_DIR: /app/uploads
+    expose:
+      - "8080"
     volumes:
-      - uploads:/app/uploads
+      - documents:/app/uploads
     depends_on:
-      migrate:
-        condition: service_completed_successfully
-
-  web:
-    build:
-      context: ../asico-management
-    restart: unless-stopped
-    depends_on:
-      app:
+      db:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/api/v1/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    # SIGTERM first: the API stops taking requests, finishes the open ones (SHUTDOWN_TIMEOUT_MS) and closes the pool.
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+    logging: *logging
 
   caddy:
-    image: caddy:2.8-alpine
+    image: caddy:2
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"
     environment:
-      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
-      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env.production}
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${FRONTEND_DIST_DIR:-/opt/asico/frontend-dist}:/srv/frontend:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - web
+      - app
+    logging: *logging
 
 volumes:
-  postgres_data:
-  uploads:
+  pgdata:
+  documents:
   caddy_data:
   caddy_config:

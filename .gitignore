@@ -3,12 +3,18 @@ node_modules/
 dist
 *.tsbuildinfo
 
-# Environment (only the example is tracked)
+# Environment: every .env file is ignored except the two examples
 .env
-# .env.*
-# .env.example
-# Production secrets on the server; the example next to it is tracked
+.env.*
+!.env.example
+!deploy/.env.production.example
+# Production secrets on the server (also covered by .env.*, kept explicit)
 deploy/.env.production
+
+# Backup output (never commit real data)
+backups/
+*.dump
+*.dump.partial
 
 # Logs
 logs

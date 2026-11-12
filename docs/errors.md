@@ -55,6 +55,7 @@ The tables are checked against the source by `tests/docs/errors.docs.test.ts`: a
 | `PAYLOAD_TOO_LARGE`        | 413    | The JSON body is over `BODY_LIMIT`.                                                                                                               |
 | `INTERNAL_ERROR`           | 500    | Anything unexpected. The cause is in the log under the `requestId`.                                                                               |
 | `REFRESH_CONFLICT`         | 409    | Two requests rotated the same refresh token at once. The cookie is kept: repeat the call.                                                         |
+| `SIGNUP_DISABLED`          | 403    | Public sign-up is turned off (`AUTH_SIGNUP_ENABLED`, off by default in production): an administrator creates users.                               |
 | `EMAIL_TAKEN`              | 409    | Sign-up, or a user's email, is already registered.                                                                                                |
 | `INVALID_CURRENT_PASSWORD` | 400    | `POST /auth/change-password` with a wrong current password.                                                                                       |
 | `INVALID_RESET_TOKEN`      | 400    | A reset link that is wrong, used or expired.                                                                                                      |

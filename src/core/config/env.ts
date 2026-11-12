@@ -21,6 +21,9 @@ export function mailAddressOf(from: string): string | undefined {
 const HOST_NAME =
   /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$/;
 
+// The marker the example env files use for every value that must be replaced.
+const PLACEHOLDER = /CHANGE_ME/i;
+
 const SMTP_VARIABLES = [
   "SMTP_HOST",
   "SMTP_PORT",
@@ -113,6 +116,15 @@ export const envSchema = z
         .transform((value) => value === "true")
         .optional(),
     ),
+    // Public sign-up (POST /auth/signup): true or false. Unset: on everywhere but production, where only an administrator
+    // creates users (POST /users). Read it through signupEnabled().
+    AUTH_SIGNUP_ENABLED: z.preprocess(
+      blankIsUnset,
+      z
+        .enum(["true", "false"])
+        .transform((value) => value === "true")
+        .optional(),
+    ),
     REFRESH_COOKIE_SAMESITE: z.preprocess(blankIsUnset, z.enum(["strict", "lax", "none"]).default("strict")),
     REFRESH_COOKIE_DOMAIN: z.preprocess(
       blankIsUnset,
@@ -160,6 +172,16 @@ export const envSchema = z
     ),
   })
   .superRefine((env, ctx) => {
+    // A value copied from an example file and never filled in: refuse it by name rather than run with it.
+    for (const [name, value] of Object.entries(env)) {
+      if (typeof value === "string" && PLACEHOLDER.test(value)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [name],
+          message: "is still a placeholder (CHANGE_ME): set the real value",
+        });
+      }
+    }
     const secureCookie = env.REFRESH_COOKIE_SECURE ?? env.NODE_ENV !== "development";
     if (env.NODE_ENV === "production" && env.REFRESH_COOKIE_SECURE === false) {
       ctx.addIssue({
@@ -201,6 +223,13 @@ export const envSchema = z
       }
     }
   });
+
+// Public sign-up is open unless AUTH_SIGNUP_ENABLED says otherwise; unset, it is closed in production only.
+export function signupEnabled(settings: Pick<Env, "AUTH_SIGNUP_ENABLED" | "NODE_ENV"> = env): boolean {
+  return settings.AUTH_SIGNUP_ENABLED ?? settings.NODE_ENV !== "production";
+}
+
+export type Env = z.output<typeof envSchema>;
 
 function loadEnv(): z.output<typeof envSchema> {
   const result = envSchema.safeParse(process.env);

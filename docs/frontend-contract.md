@@ -168,6 +168,8 @@ The auth routes are limited to 10 calls per 15 minutes per client (each route ha
 
 **Sign up** `POST /auth/signup`
 
+Only while public sign-up is on (`AUTH_SIGNUP_ENABLED`; unset, it is off in production). Otherwise `403 SIGNUP_DISABLED`, before the body is read: hide the sign-up link and tell the person to ask an administrator.
+
 <!-- body: signupSchema -->
 
 | Field      | Required | Type                      | Notes                                   |
@@ -258,7 +260,7 @@ How it behaves, and what the frontend does:
 
 <!-- modules: auth -->
 
-**Errors:** `ACCOUNT_INACTIVE`, `EMAIL_TAKEN`, `INVALID_CREDENTIALS`, `INVALID_CURRENT_PASSWORD`, `INVALID_REFRESH_TOKEN`, `INVALID_RESET_TOKEN`, `REFRESH_CONFLICT`, `REFRESH_TOKEN_REUSED`
+**Errors:** `ACCOUNT_INACTIVE`, `EMAIL_TAKEN`, `INVALID_CREDENTIALS`, `INVALID_CURRENT_PASSWORD`, `INVALID_REFRESH_TOKEN`, `INVALID_RESET_TOKEN`, `REFRESH_CONFLICT`, `REFRESH_TOKEN_REUSED`, `SIGNUP_DISABLED`
 
 ## Users and permissions
 

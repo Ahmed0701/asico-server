@@ -9,6 +9,7 @@
   "errors.internal": "خطأ داخلي في الخادم",
   "errors.invalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
   "errors.accountInactive": "حسابك غير مفعّل بعد",
+  "errors.signupDisabled": "التسجيل الذاتي متوقف. اطلب من المسؤول إنشاء حسابك.",
   "errors.emailTaken": "هذا البريد الإلكتروني مسجّل بالفعل",
   "errors.invalidRefreshToken": "جلستك غير صالحة أو منتهية",
   "errors.refreshTokenReused": "لم تعد جلستك صالحة. يرجى تسجيل الدخول مرة أخرى",

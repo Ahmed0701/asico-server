@@ -6,9 +6,12 @@ src/generated
 .git
 .github
 .claude
-.env
-.env.*
+.vscode
+**/.env
+**/.env.*
 !.env.example
+deploy
+docs
 tests
 *.log
 *.md

@@ -135,6 +135,7 @@ describe.skipIf(!RUN)("the load check", () => {
   let auditId = "";
   let phaseId = "";
   let engineerId = "";
+  let villaIds: string[] = [];
   let villaNumbers: string[] = [];
   let contractorNames: string[] = [];
   const rows: Row[] = [];
@@ -223,6 +224,7 @@ describe.skipIf(!RUN)("the load check", () => {
       `SELECT v."id", v."villaNumber", c."name" AS contractor FROM "Villa" v JOIN "Contractor" c ON c."id" = v."contractorId" ORDER BY v."villaNumber"`,
     );
     villaId = villas.rows[0].id as string;
+    villaIds = villas.rows.map((row) => row.id as string);
     villaNumbers = villas.rows.map((row) => row.villaNumber as string);
     contractorNames = villas.rows.map((row) => row.contractor as string);
     contractorId = (await q(`SELECT "id" FROM "Contractor" ORDER BY "name" LIMIT 1`)).rows[0].id as string;
@@ -875,6 +877,14 @@ describe.skipIf(!RUN)("the load check", () => {
       WRITE_RUNS,
       2,
     );
+    // A villa has at most one open work per electrical phase, and the seed gave every villa all the phases: each POST
+    // here gets the next villa in a phase made for this step, which no villa has yet.
+    const writePhaseId = (
+      await q(
+        `INSERT INTO "ElecPhase" ("id","name","sortOrder","updatedAt") VALUES (gen_random_uuid()::text, 'Load write phase', 1000, now()) RETURNING "id"`,
+      )
+    ).rows[0].id as string;
+    let posting = 0;
     await measure(
       "POST /open-works",
       "write",
@@ -882,7 +892,11 @@ describe.skipIf(!RUN)("the load check", () => {
         const res = await request(server)
           .post("/api/v1/open-works")
           .set(await headers({ "Idempotency-Key": randomUUID() }))
-          .send({ villaId, elecPhaseId: phaseId, priority: "HIGH" });
+          .send({
+            villaId: villaIds[posting++ % villaIds.length],
+            elecPhaseId: writePhaseId,
+            priority: "HIGH",
+          });
         return {
           ok: res.status === 201,
           detail: res.status === 201 ? "" : JSON.stringify(res.body).slice(0, 200),
@@ -944,6 +958,15 @@ describe.skipIf(!RUN)("the load check", () => {
           ]),
         ),
       );
+    // One open work per villa and phase: every file uses phases no villa has yet. The dry runs share block 0 (they write
+    // nothing); real run r uses block r + 1, so no real run repeats a pair an earlier one created.
+    const phasesPerRun = Math.ceil(IMPORT_ROWS / VILLAS);
+    await q(
+      `INSERT INTO "ElecPhase" ("id","name","sortOrder","updatedAt")
+       SELECT gen_random_uuid()::text, 'Import phase ' || g, 2000 + g, now() FROM generate_series(1, ${phasesPerRun * (IMPORT_RUNS + 1)}) g`,
+    );
+    const importPhase = (salt: string, run: number, row: number) =>
+      `Import phase ${(salt === "dry" ? 0 : run + 1) * phasesPerRun + Math.floor(row / VILLAS) + 1}`;
     const works = (salt: string) => async (run: number) =>
       workbookOf(
         [
@@ -959,7 +982,7 @@ describe.skipIf(!RUN)("the load check", () => {
         // An open work has no natural key, so a file differs from the one before it by its start date (a repeated file is refused).
         Array.from({ length: IMPORT_ROWS }, (_, i) => [
           villaNumbers[i % VILLAS] ?? "",
-          `Phase ${(i % PHASES) + 1}`,
+          importPhase(salt, run, i),
           "In progress",
           "Medium",
           40,

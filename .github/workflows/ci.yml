@@ -40,4 +40,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build --target runtime -t asico-server:ci .
-      - run: docker build --target migrate -t asico-server-migrate:ci .
+      # The same image runs the migrations (npx prisma migrate deploy) and the seed (node dist/cli/seed.js).
+      - run: docker run --rm asico-server:ci sh -c "test -f dist/cli/seed.js && npx --no-install prisma --version"
