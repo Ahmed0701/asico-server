@@ -87,6 +87,26 @@ export const PERMISSIONS = {
   MAINTENANCE_UPDATE: "maintenance:update",
   MAINTENANCE_DELETE: "maintenance:delete",
 
+  // Owner notes: the list (open and done) and one note are :read, and :read also receives the daily reminders.
+  // Checking one as done is :update.
+  OWNER_NOTES_READ: "owner-notes:read",
+  OWNER_NOTES_CREATE: "owner-notes:create",
+  OWNER_NOTES_UPDATE: "owner-notes:update",
+  OWNER_NOTES_DELETE: "owner-notes:delete",
+  // Foreman missions: the list (open and done) and one note are :read, and :read also receives the daily reminders.
+  // Checking one as done is :update.
+  FOREMAN_MISSIONS_READ: "foreman-missions:read",
+  FOREMAN_MISSIONS_CREATE: "foreman-missions:create",
+  FOREMAN_MISSIONS_UPDATE: "foreman-missions:update",
+  FOREMAN_MISSIONS_DELETE: "foreman-missions:delete",
+
+  // Payments to contractors: the list, one payment, its files, the Excel and PDF export, and the daily overdue reminders
+  // are :read. :create also imports from Excel; :update marks them paid and manages the files.
+  PAYMENTS_READ: "payments:read",
+  PAYMENTS_CREATE: "payments:create",
+  PAYMENTS_UPDATE: "payments:update",
+  PAYMENTS_DELETE: "payments:delete",
+
   // Material deliveries from the switchgear and cable factories. :update also manages the factories list and the
   // delivery notes; :read also opens a delivery note and a villa's materials summary.
   MATERIALS_READ: "materials:read",

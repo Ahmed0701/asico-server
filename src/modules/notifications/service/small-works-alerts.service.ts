@@ -17,15 +17,30 @@ import {
 export type AlertRunResult = {
   // true: another server instance was running the job, so this run did nothing.
   skipped: boolean;
-  // The notifications this run made, by kind: small works due soon and overdue, and open works overdue.
-  raised: { dueSoon: number; overdue: number; openWorksOverdue: number };
+  // The notifications this run made, by kind: small works due soon and overdue, open works overdue, and the day's reminders
+  // of the open owner notes and foreman missions.
+  raised: {
+    dueSoon: number;
+    overdue: number;
+    openWorksOverdue: number;
+    ownerNoteReminders: number;
+    foremanMissionReminders: number;
+    paymentsOverdue: number;
+  };
   // The digest: notifications it listed, emails sent, and emails that failed (those are retried by the next run).
   digest: { notifications: number; sent: number; failed: number };
 };
 
 const NOTHING: AlertRunResult = {
   skipped: false,
-  raised: { dueSoon: 0, overdue: 0, openWorksOverdue: 0 },
+  raised: {
+    dueSoon: 0,
+    overdue: 0,
+    openWorksOverdue: 0,
+    ownerNoteReminders: 0,
+    foremanMissionReminders: 0,
+    paymentsOverdue: 0,
+  },
   digest: { notifications: 0, sent: 0, failed: 0 },
 };
 
@@ -69,10 +84,40 @@ export class SmallWorksAlertsService {
         lateOpenWorks.length > 0 ? await this.repository.recipientIds(tx, PERMISSIONS.OPEN_WORKS_READ) : [],
         tx,
       );
+      // The open owner notes: one reminder per note and day, seen by the admins and by who may read owner notes.
+      const notesToRemind = await this.repository.findOwnerNotesToRemind(window.today, tx);
+      const ownerNoteReminders = await this.repository.createOwnerNoteNotifications(
+        notesToRemind,
+        window.today,
+        notesToRemind.length > 0 ? await this.repository.recipientIds(tx, PERMISSIONS.OWNER_NOTES_READ) : [],
+        tx,
+      );
+      // The open foreman missions: one reminder per mission and day, seen by the admins and by who may read foreman missions.
+      const missionsToRemind = await this.repository.findForemanMissionsToRemind(window.today, tx);
+      const foremanMissionReminders = await this.repository.createForemanMissionNotifications(
+        missionsToRemind,
+        window.today,
+        missionsToRemind.length > 0
+          ? await this.repository.recipientIds(tx, PERMISSIONS.FOREMAN_MISSIONS_READ)
+          : [],
+        tx,
+      );
+      // The pending payments past their due date: one reminder per payment and day, seen by the admins and by who may
+      // read payments.
+      const paymentsToRemind = await this.repository.findPaymentsToRemind(window.today, tx);
+      const paymentsOverdue = await this.repository.createPaymentNotifications(
+        paymentsToRemind,
+        window.today,
+        paymentsToRemind.length > 0 ? await this.repository.recipientIds(tx, PERMISSIONS.PAYMENTS_READ) : [],
+        tx,
+      );
       return {
         dueSoon: made.filter((one) => one.kind === "SMALL_WORK_DUE_SOON").length,
         overdue: made.filter((one) => one.kind === "SMALL_WORK_OVERDUE").length,
         openWorksOverdue,
+        ownerNoteReminders,
+        foremanMissionReminders,
+        paymentsOverdue,
       };
     }, TRANSACTION);
     if (raised === null) {

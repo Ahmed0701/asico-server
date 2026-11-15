@@ -152,12 +152,15 @@ describe("daily reports", () => {
       reportDate: day(offset),
     });
 
-  it("the total labour card adds up the workers of every labour daily report, all dates", async () => {
+  it("the daily total labour card adds up the workers of today's labour daily reports, and of yesterday's", async () => {
     report(0).workersCount = 12;
+    report(0).workersCount = 5;
     report(-1).workersCount = 30;
+    report(-2).workersCount = 9;
     report(-400).workersCount = 8;
+    report(1).workersCount = 100;
 
-    expect((await service().summary(ADMIN)).totalLabour).toEqual({ total: 50 });
+    expect((await service().summary(ADMIN)).totalLabour).toEqual({ today: 17, yesterday: 30 });
   });
 
   it("counts the reports written for today", async () => {
@@ -344,7 +347,7 @@ describe("daily labour", () => {
 
     expect((await adminSummary()).labour).toEqual({ today: 65, last7Days: 75 });
     // The daily labour entries do not feed the total labour card: it adds up the labour daily reports.
-    expect((await service().summary(ADMIN)).totalLabour).toEqual({ total: 0 });
+    expect((await service().summary(ADMIN)).totalLabour).toEqual({ today: 0, yesterday: 0 });
   });
 
   it("the last 7 days are today and the six before it", async () => {
@@ -381,6 +384,9 @@ describe("what each user may see", () => {
     "labour",
     "totalLabour",
     "maintenance",
+    "ownerNotes",
+    "foremanMissions",
+    "payments",
   ] as const;
   // The keys each card fills.
   const CARD_KEYS: Record<DashboardCard, readonly (typeof KEYS)[number][]> = {
@@ -394,6 +400,9 @@ describe("what each user may see", () => {
     labour: ["labour"],
     totalLabour: ["totalLabour"],
     maintenance: ["maintenance"],
+    ownerNotes: ["ownerNotes"],
+    foremanMissions: ["foremanMissions"],
+    payments: ["payments"],
   };
 
   const employee = (...codes: string[]) => {
@@ -419,6 +428,9 @@ describe("what each user may see", () => {
       labour: ["daily-labour:read"],
       totalLabour: ["daily-reports:read"],
       maintenance: ["maintenance:read"],
+      ownerNotes: ["owner-notes:read"],
+      foremanMissions: ["foreman-missions:read"],
+      payments: ["payments:read"],
     });
   });
 
@@ -446,6 +458,9 @@ describe("what each user may see", () => {
       labour: null,
       totalLabour: null,
       maintenance: null,
+      ownerNotes: null,
+      foremanMissions: null,
+      payments: null,
       generatedAt: NOW.toISOString(),
     });
   });
@@ -508,6 +523,9 @@ describe("what each user may see", () => {
       "site-reports:read",
       "daily-labour:read",
       "maintenance:read",
+      "owner-notes:read",
+      "foreman-missions:read",
+      "payments:read",
     );
 
     expect(nullKeys(await service().summary(all))).toEqual([]);

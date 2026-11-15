@@ -21,6 +21,15 @@ export type VillaCounterRow = {
 
 // Maintenance villas still open, and solved.
 export type MaintenanceCounterRow = { open: Count; solved: Count };
+export type OwnerNoteCounterRow = { open: Count; done: Count };
+export type PaymentCounterRow = {
+  pendingCount: Count;
+  pendingMinor: Count;
+  overdueCount: Count;
+  overdueMinor: Count;
+  paidThisMonthMinor: Count;
+};
+export type ForemanMissionCounterRow = { open: Count; done: Count };
 
 // Progress over all villas: the sum of the villas' overall progress (each at most 100), the number of active phases, and
 // how many villas are in each state.
@@ -260,10 +269,16 @@ export class DashboardRepository {
     return only(rows, "labour");
   }
 
-  // The workers of every labour daily report added up (DailyReport.workersCount), all dates: the total labour card.
-  async dailyReportWorkers(db: Db = prisma): Promise<{ total: Count }> {
-    const rows = await db.$queryRaw<{ total: Count }[]>`
-      SELECT COALESCE(sum(r."workersCount"), 0) AS "total"
+  // The workers of the labour daily reports added up (DailyReport.workersCount), for today and for yesterday: the daily
+  // total labour card.
+  async dailyReportWorkers(
+    { today }: DayRange,
+    db: Db = prisma,
+  ): Promise<{ today: Count; yesterday: Count }> {
+    const rows = await db.$queryRaw<{ today: Count; yesterday: Count }[]>`
+      SELECT
+        COALESCE(sum(r."workersCount") FILTER (WHERE r."reportDate" = ${asDay(today)}::date), 0) AS "today",
+        COALESCE(sum(r."workersCount") FILTER (WHERE r."reportDate" = ${asDay(today)}::date - 1), 0) AS "yesterday"
       FROM "DailyReport" r`;
     return only(rows, "daily report workers");
   }
@@ -275,6 +290,41 @@ export class DashboardRepository {
         count(*) FILTER (WHERE m."solvedAt" IS NOT NULL) AS "solved"
       FROM "MaintenanceVilla" m`;
     return only(rows, "maintenance");
+  }
+
+  // `today` is YYYY-MM-DD in APP_TIMEZONE: a pending payment due before it is overdue; the month is today's.
+  async paymentCounters(today: string, db: Db = prisma): Promise<PaymentCounterRow> {
+    const rows = await db.$queryRaw<PaymentCounterRow[]>`
+      SELECT
+        count(*) FILTER (WHERE p."status" = 'PENDING') AS "pendingCount",
+        COALESCE(sum(p."amountMinor") FILTER (WHERE p."status" = 'PENDING'), 0) AS "pendingMinor",
+        count(*) FILTER (WHERE p."status" = 'PENDING' AND p."dueDate" < ${today}::date) AS "overdueCount",
+        COALESCE(sum(p."amountMinor") FILTER (WHERE p."status" = 'PENDING' AND p."dueDate" < ${today}::date), 0)
+          AS "overdueMinor",
+        COALESCE(sum(p."amountMinor") FILTER (
+          WHERE p."status" = 'PAID' AND p."paidDate" >= date_trunc('month', ${today}::date)::date
+            AND p."paidDate" <= ${today}::date
+        ), 0) AS "paidThisMonthMinor"
+      FROM "ContractorPayment" p`;
+    return only(rows, "payments");
+  }
+
+  async ownerNoteCounters(db: Db = prisma): Promise<OwnerNoteCounterRow> {
+    const rows = await db.$queryRaw<OwnerNoteCounterRow[]>`
+      SELECT
+        count(*) FILTER (WHERE o."doneAt" IS NULL) AS "open",
+        count(*) FILTER (WHERE o."doneAt" IS NOT NULL) AS "done"
+      FROM "OwnerNote" o`;
+    return only(rows, "owner notes");
+  }
+
+  async foremanMissionCounters(db: Db = prisma): Promise<ForemanMissionCounterRow> {
+    const rows = await db.$queryRaw<ForemanMissionCounterRow[]>`
+      SELECT
+        count(*) FILTER (WHERE o."doneAt" IS NULL) AS "open",
+        count(*) FILTER (WHERE o."doneAt" IS NOT NULL) AS "done"
+      FROM "ForemanMission" o`;
+    return only(rows, "foreman missions");
   }
 
   // The codes an EMPLOYEE has been granted (an ADMIN holds every one by role and has no rows).

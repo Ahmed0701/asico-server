@@ -215,6 +215,7 @@ function activePhasesOf(villaId: string) {
         // Read from the villa's open works, like PHASE_PROGRESS.
         progress: openWorkProgressOf(villaId, phase.id),
         version: row?.version ?? 1,
+        lastChange: null,
       };
     });
 }

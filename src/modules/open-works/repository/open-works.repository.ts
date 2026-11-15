@@ -63,6 +63,8 @@ export type OpenWorkPatch = {
   contractorId?: string | null;
   startDate?: Date | null;
   endDate?: Date | null;
+  progressUpdatedAt?: Date;
+  progressUpdatedById?: string;
 };
 
 // What a row of the import file is checked against.
@@ -196,7 +198,15 @@ export class OpenWorksRepository {
   }
 
   async create(data: NewOpenWork, db: Db = prisma): Promise<OpenWorkRow> {
-    return db.workItem.create({ data: { ...data, source: "MANUAL" }, select });
+    return db.workItem.create({
+      data: {
+        ...data,
+        source: "MANUAL",
+        progressUpdatedAt: new Date(),
+        progressUpdatedById: data.createdById,
+      },
+      select,
+    });
   }
 
   // Compare-and-set: changes the row only if it is still at `version`, and bumps the version. Null: it was not.
@@ -279,7 +289,14 @@ export class OpenWorksRepository {
 
   // Saves all the rows as MANUAL items in one statement and returns their ids.
   async createMany(rows: readonly NewOpenWork[], db: Db = prisma): Promise<string[]> {
-    const data = rows.map((row) => ({ ...row, id: randomUUID(), source: "MANUAL" as const }));
+    const now = new Date();
+    const data = rows.map((row) => ({
+      ...row,
+      id: randomUUID(),
+      source: "MANUAL" as const,
+      progressUpdatedAt: now,
+      progressUpdatedById: row.createdById,
+    }));
     await db.workItem.createMany({ data });
     return data.map((row) => row.id);
   }

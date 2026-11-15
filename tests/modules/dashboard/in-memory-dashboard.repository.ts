@@ -6,6 +6,9 @@ import type {
   DailyCounterRow,
   LabourCounterRow,
   MaintenanceCounterRow,
+  OwnerNoteCounterRow,
+  PaymentCounterRow,
+  ForemanMissionCounterRow,
   DashboardRepository,
   Db,
   OpenWorkCounterRow,
@@ -36,6 +39,8 @@ import { smallWorkTables } from "../small-works/small-work-tables.js";
 import { villaTables, type StoredVilla } from "../villas/in-memory-villas.repository.js";
 import { InMemoryAuditRepository, type StoredAuditRow } from "../audit/in-memory-audit.repository.js";
 import { maintenanceTables } from "../maintenance/maintenance-tables.js";
+import { ownerNoteTables } from "../owner-notes/owner-notes-tables.js";
+import { foremanMissionTables } from "../foreman-missions/foreman-missions-tables.js";
 
 // The dashboard's figures worked out in plain JavaScript over the fakes' tables. The real queries are SQL; the
 // dry run checks those against the real database. This is what lets the service and routes be tested without one.
@@ -160,6 +165,27 @@ export class InMemoryDashboardRepository implements DashboardRepository {
       }));
   }
 
+  // No payments in these fakes: the SQL is tested against a real database (tests/db).
+  async paymentCounters(): Promise<PaymentCounterRow> {
+    return { pendingCount: 0, pendingMinor: 0, overdueCount: 0, overdueMinor: 0, paidThisMonthMinor: 0 };
+  }
+
+  async ownerNoteCounters(): Promise<OwnerNoteCounterRow> {
+    const rows = ownerNoteTables.rows;
+    return {
+      open: rows.filter((row) => row.doneAt === null).length,
+      done: rows.filter((row) => row.doneAt !== null).length,
+    };
+  }
+
+  async foremanMissionCounters(): Promise<ForemanMissionCounterRow> {
+    const rows = foremanMissionTables.rows;
+    return {
+      open: rows.filter((row) => row.doneAt === null).length,
+      done: rows.filter((row) => row.doneAt !== null).length,
+    };
+  }
+
   async maintenanceCounters(): Promise<MaintenanceCounterRow> {
     const rows = maintenanceTables.rows;
     return {
@@ -168,10 +194,15 @@ export class InMemoryDashboardRepository implements DashboardRepository {
     };
   }
 
-  async dailyReportWorkers(): Promise<{ total: number }> {
-    return {
-      total: dailyReportTables.reports.reduce((sum, report) => sum + report.workersCount, 0),
-    };
+  async dailyReportWorkers({ today }: { today: Date }): Promise<{ today: number; yesterday: number }> {
+    const dayOf = (value: Date) => value.toISOString().slice(0, 10);
+    const todayKey = dayOf(today);
+    const yesterdayKey = dayOf(new Date(today.getTime() - 24 * 60 * 60 * 1000));
+    const sumOn = (key: string) =>
+      dailyReportTables.reports
+        .filter((report) => dayOf(report.reportDate) === key)
+        .reduce((sum, report) => sum + report.workersCount, 0);
+    return { today: sumOn(todayKey), yesterday: sumOn(yesterdayKey) };
   }
 
   async openWorkCounters(today: Date): Promise<OpenWorkCounterRow> {

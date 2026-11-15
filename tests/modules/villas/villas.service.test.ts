@@ -46,6 +46,10 @@ const siteReports = vi.fn<(args: unknown) => Promise<number>>();
 const labour = vi.fn<(args: unknown) => Promise<number>>();
 // And for its material deliveries.
 const deliveries = vi.fn<(args: unknown) => Promise<number>>();
+const ownerNotes = vi.fn<(args: unknown) => Promise<number>>();
+const foremanMissions = vi.fn<(args: unknown) => Promise<number>>();
+const payments = vi.fn<(args: unknown) => Promise<number>>();
+const variationOrders = vi.fn<(args: unknown) => Promise<number>>();
 const tx = {
   marker: "tx",
   workItem: { count: manualItems },
@@ -54,6 +58,10 @@ const tx = {
   siteReport: { count: siteReports },
   dailyLabour: { count: labour },
   materialDelivery: { count: deliveries },
+  ownerNote: { count: ownerNotes },
+  foremanMission: { count: foremanMissions },
+  contractorPayment: { count: payments },
+  variationOrder: { count: variationOrders },
 } as unknown as Db;
 
 const ENG = "11111111-1111-4111-8111-111111111111";
@@ -178,6 +186,14 @@ beforeEach(() => {
   labour.mockResolvedValue(0);
   deliveries.mockReset();
   deliveries.mockResolvedValue(0);
+  ownerNotes.mockReset();
+  foremanMissions.mockReset();
+  ownerNotes.mockResolvedValue(0);
+  foremanMissions.mockResolvedValue(0);
+  payments.mockReset();
+  payments.mockResolvedValue(0);
+  variationOrders.mockReset();
+  variationOrders.mockResolvedValue(0);
   repo = makeRepo();
   repo.lockVersion.mockResolvedValue(1);
   repo.updateScalars.mockResolvedValue(true);
@@ -1496,6 +1512,10 @@ describe("remove", () => {
       siteReports.mockImplementation(async () => (order.push("site reports"), 0));
       labour.mockImplementation(async () => (order.push("daily labour"), 0));
       deliveries.mockImplementation(async () => (order.push("deliveries"), 0));
+      ownerNotes.mockImplementation(async () => (order.push("owner notes"), 0));
+      foremanMissions.mockImplementation(async () => (order.push("foreman missions"), 0));
+      payments.mockImplementation(async () => (order.push("payments"), 0));
+      variationOrders.mockImplementation(async () => (order.push("variation orders"), 0));
       repo.delete.mockImplementation(async () => (order.push("delete"), true));
 
       await service.remove(actor, "villa-1", ctx);
@@ -1505,6 +1525,8 @@ describe("remove", () => {
       expect(siteReports).toHaveBeenCalledWith({ where: { villaId: "villa-1" } });
       expect(labour).toHaveBeenCalledWith({ where: { villaId: "villa-1" } });
       expect(deliveries).toHaveBeenCalledWith({ where: { villaId: "villa-1" } });
+      expect(ownerNotes).toHaveBeenCalledWith({ where: { villaId: "villa-1" } });
+      expect(foremanMissions).toHaveBeenCalledWith({ where: { villaId: "villa-1" } });
       expect(order).toEqual([
         "lock",
         "count",
@@ -1512,8 +1534,23 @@ describe("remove", () => {
         "site reports",
         "daily labour",
         "deliveries",
+        "owner notes",
+        "foreman missions",
+        "payments",
+        "variation orders",
         "delete",
       ]);
+    });
+
+    it("is refused with 409 VILLA_HAS_RECORDS when it has an owner note: nothing is deleted", async () => {
+      repo.findSnapshot.mockResolvedValue(snapshotRow());
+      ownerNotes.mockResolvedValue(1);
+
+      expect(await failure(service.remove(actor, "villa-1", ctx))).toMatchObject({
+        statusCode: 409,
+        code: "VILLA_HAS_RECORDS",
+      });
+      expect(repo.delete).not.toHaveBeenCalled();
     });
 
     it("is refused with 409 VILLA_HAS_RECORDS when it has a material delivery: nothing is deleted", async () => {

@@ -100,6 +100,10 @@ export function toDetailDto(row: VillaDetailRow): VillaDetailDto {
       progress: averageProgress(phase.progress, 1),
       state: stateOf(phase.progress),
       version: phase.version,
+      lastChange: phase.lastChange && {
+        at: phase.lastChange.at.toISOString(),
+        by: phase.lastChange.by && { id: phase.lastChange.by.id, name: phase.lastChange.by.name },
+      },
     })),
   };
 }

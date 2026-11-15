@@ -204,8 +204,17 @@ describe("GET /dashboard/summary", () => {
         smallWorks: { total: 0, pending: 0, dueSoon: 0, overdue: 0, urgent: [] },
         siteReports: { count: 0, averageRating: null },
         labour: { today: 0, last7Days: 0 },
-        totalLabour: { total: 0 },
+        totalLabour: { today: 0, yesterday: 0 },
         maintenance: { open: 0, solved: 0 },
+        ownerNotes: { open: 0, done: 0 },
+        foremanMissions: { open: 0, done: 0 },
+        payments: {
+          pendingCount: 0,
+          pendingMinor: 0,
+          overdueCount: 0,
+          overdueMinor: 0,
+          paidThisMonthMinor: 0,
+        },
         delayedSmallWorks: { overdue: 0, dueSoon: 0 },
         generatedAt: "2026-10-12T15:37:42.123Z",
       },
@@ -234,6 +243,9 @@ describe("GET /dashboard/summary", () => {
       "totalLabour",
       "delayedSmallWorks",
       "maintenance",
+      "ownerNotes",
+      "foremanMissions",
+      "payments",
       "generatedAt",
     ]);
     for (const value of [data.villas.total, data.overdue.count, data.upcoming.count]) {
@@ -286,8 +298,11 @@ describe("GET /dashboard/summary", () => {
       smallWorks: { total: 0, pending: 0, dueSoon: 0, overdue: 0, urgent: [] },
       siteReports: { count: 0, averageRating: null },
       labour: { today: 0, last7Days: 0 },
-      totalLabour: { total: 0 },
+      totalLabour: { today: 0, yesterday: 0 },
       maintenance: { open: 0, solved: 0 },
+      ownerNotes: { open: 0, done: 0 },
+      foremanMissions: { open: 0, done: 0 },
+      payments: { pendingCount: 0, pendingMinor: 0, overdueCount: 0, overdueMinor: 0, paidThisMonthMinor: 0 },
       delayedSmallWorks: { overdue: 0, dueSoon: 0 },
       generatedAt: "2026-10-12T15:37:42.123Z",
     });
@@ -338,6 +353,9 @@ describe("GET /dashboard/summary", () => {
       labour: undefined,
       totalLabour: undefined,
       maintenance: undefined,
+      ownerNotes: undefined,
+      foremanMissions: undefined,
+      payments: undefined,
     });
     expect(strip(a)).toEqual(strip(b));
     expect(strip(a)).toEqual(strip(c));
@@ -521,6 +539,9 @@ describe("GET /dashboard/summary: the cards a user may not see are null", () => 
     "labour",
     "totalLabour",
     "maintenance",
+    "ownerNotes",
+    "foremanMissions",
+    "payments",
   ];
 
   it("dashboard:read alone answers 200 with every key present and null, and the time", async () => {

@@ -86,8 +86,11 @@ describe("an empty database", () => {
       // No report: a zero count and no average (not 0, which would read as a bad rating).
       siteReports: { count: 0, averageRating: null },
       labour: { today: 0, last7Days: 0 },
-      totalLabour: { total: 0 },
+      totalLabour: { today: 0, yesterday: 0 },
       maintenance: { open: 0, solved: 0 },
+      ownerNotes: { open: 0, done: 0 },
+      foremanMissions: { open: 0, done: 0 },
+      payments: { pendingCount: 0, pendingMinor: 0, overdueCount: 0, overdueMinor: 0, paidThisMonthMinor: 0 },
       delayedSmallWorks: { overdue: 0, dueSoon: 0 },
       generatedAt: NOW.toISOString(),
     });
@@ -357,6 +360,9 @@ describe("one consistent summary", () => {
       "totalLabour",
       "delayedSmallWorks",
       "maintenance",
+      "ownerNotes",
+      "foremanMissions",
+      "payments",
       "generatedAt",
     ]);
     expect(Object.keys(summary.villas)).toEqual(["total"]);
@@ -587,8 +593,17 @@ describe("what the service asks the repository", () => {
       smallWorkUrgent: vi.fn().mockResolvedValue([]),
       siteReportCounters: vi.fn().mockResolvedValue({ total: 4n, ratingSum: 15n }),
       labourCounters: vi.fn().mockResolvedValue({ today: 90n, last7Days: 600n, total: 1n }),
-      dailyReportWorkers: vi.fn().mockResolvedValue({ total: 9000n }),
+      dailyReportWorkers: vi.fn().mockResolvedValue({ today: 140n, yesterday: 95n }),
       maintenanceCounters: vi.fn().mockResolvedValue({ open: 3n, solved: 1n }),
+      ownerNoteCounters: vi.fn().mockResolvedValue({ open: 2n, done: 5n }),
+      foremanMissionCounters: vi.fn().mockResolvedValue({ open: 1n, done: 4n }),
+      paymentCounters: vi.fn().mockResolvedValue({
+        pendingCount: 2n,
+        pendingMinor: 1500n,
+        overdueCount: 1n,
+        overdueMinor: 500n,
+        paidThisMonthMinor: 9000n,
+      }),
       recentAudit: vi.fn().mockResolvedValue([]),
     };
     return {
@@ -696,7 +711,7 @@ describe("what the service asks the repository", () => {
     // 15 over 4 reports is 3.75, shown with one decimal, halves up.
     expect(summary.siteReports).toEqual({ count: 4, averageRating: 3.8 });
     expect(summary.labour).toEqual({ today: 90, last7Days: 600 });
-    expect(summary.totalLabour).toEqual({ total: 9000 });
+    expect(summary.totalLabour).toEqual({ today: 140, yesterday: 95 });
     expect(summary.delayedSmallWorks).toEqual({ overdue: 1, dueSoon: 2 });
     expect(JSON.stringify(summary)).not.toMatch(/\dn\b/);
   });
@@ -718,6 +733,9 @@ describe("what the service asks the repository", () => {
         labour: null,
         totalLabour: null,
         maintenance: null,
+        ownerNotes: null,
+        foremanMissions: null,
+        payments: null,
       },
       NOW,
       {
@@ -742,11 +760,14 @@ describe("what the service asks the repository", () => {
       "areaBreakdown",
       "dailyReportCounters",
       "dailyReportWorkers",
+      "foremanMissionCounters",
       "grantedCodes",
       "labourCounters",
       "maintenanceCounters",
       "openWorkCounters",
       "openWorkOverdue",
+      "ownerNoteCounters",
+      "paymentCounters",
       "progressCounters",
       "recentAudit",
       "siteReportCounters",

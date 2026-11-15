@@ -79,6 +79,12 @@ describe("migration order", () => {
       "material_required_default",
       "remove_fixed_materials",
       "users_delete_permission",
+      "owner_notes",
+      "owner_notes_owner_from_villa",
+      "foreman_missions",
+      "contractor_payments",
+      "variation_orders",
+      "open_work_progress_updated",
     ]);
   });
 

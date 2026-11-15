@@ -60,6 +60,7 @@ const ENGLISH: Record<string, string> = {
   "export.open-works": "Exported open works",
   "export.site-reports": "Exported site reports",
   "export.material-deliveries": "Exported material deliveries",
+  "export.payments": "Exported payments",
   "export.material-balance": "Exported the material balance",
   "export.small-works": "Exported daily small works",
   "export.villas": "Exported villas",
@@ -99,6 +100,31 @@ const ENGLISH: Record<string, string> = {
   "maintenance.delete": "Deleted a maintenance villa",
   "maintenance.solved": "Checked a maintenance villa as solved",
   "maintenance.solved_undo": "Took back a maintenance villa's solved",
+  "owner_note.create": "Added an owner note",
+  "owner_note.update": "Updated an owner note",
+  "owner_note.delete": "Deleted an owner note",
+  "owner_note.done": "Checked an owner note as done",
+  "owner_note.done_undo": "Took back an owner note's done",
+  "foreman_mission.create": "Added a foreman mission",
+  "foreman_mission.update": "Updated a foreman mission",
+  "foreman_mission.delete": "Deleted a foreman mission",
+  "foreman_mission.done": "Checked a foreman mission as done",
+  "foreman_mission.done_undo": "Took back a foreman mission's done",
+  "payment.create": "Added a payment",
+  "payment.update": "Updated a payment",
+  "payment.delete": "Deleted a payment",
+  "payment.paid": "Marked a payment as paid",
+  "payment.paid_undo": "Took back a payment's paid",
+  "payment.file_upload": "Uploaded payment files",
+  "payment.file_delete": "Deleted a payment file",
+  "payment.import": "Imported payments",
+  "variation_order.create": "Added a variation order",
+  "variation_order.update": "Updated a variation order",
+  "variation_order.delete": "Deleted a variation order",
+  "variation_order.paid": "Marked a variation order as paid",
+  "variation_order.paid_undo": "Marked a variation order as pending",
+  "variation_order.file_upload": "Uploaded variation order files",
+  "variation_order.file_delete": "Deleted a variation order file",
   "factory.create": "Added a factory",
   "factory.update": "Updated a factory",
   "factory.delete": "Deleted a factory",
@@ -120,7 +146,7 @@ const ENGLISH: Record<string, string> = {
 describe("action labels", () => {
   it("knows exactly the actions of the list above", () => {
     expect(Object.keys(ACTION_LABEL_KEYS).sort()).toEqual(Object.keys(ENGLISH).sort());
-    expect(Object.keys(ENGLISH)).toHaveLength(96);
+    expect(Object.keys(ENGLISH)).toHaveLength(122);
   });
 
   it.each(Object.entries(ENGLISH))("%s reads %j in English", (code, english) => {

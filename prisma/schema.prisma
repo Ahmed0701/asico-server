@@ -109,7 +109,8 @@ model User {
   auditLogs           AuditLog[]
   idempotencyKeys     IdempotencyKey[]
   importBatches       ImportBatch[]
-  workItems           WorkItem[]
+  workItems           WorkItem[]              @relation("WorkItemCreator")
+  progressWorkItems   WorkItem[]              @relation("WorkItemProgressUpdater")
   dailyReports        DailyReport[]
   dailySmallWorks     DailySmallWork[]
   siteReports         SiteReport[]
@@ -216,22 +217,23 @@ model ElecPhase {
 }
 
 model Contractor {
-  id              String           @id @default(uuid())
+  id              String              @id @default(uuid())
   name            String
   phone           String
   email           String?
-  status          PartyStatus      @default(ACTIVE)
+  status          PartyStatus         @default(ACTIVE)
   villas          Villa[]
   workItems       WorkItem[]
   // The daily reports of this contractor. A contractor with reports cannot be deleted.
   dailyReports    DailyReport[]
   // The labour rows that name this contractor. A contractor with labour rows cannot be deleted either.
   dailyLabours    DailyLabour[]
+  payments        ContractorPayment[]
   // The small works this contractor is assigned to. A contractor with small works cannot be deleted either.
   dailySmallWorks DailySmallWork[]
-  version         Int              @default(1)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  version         Int                 @default(1)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "Contractor_name_trgm_idx")
 }
@@ -335,6 +337,128 @@ model MaterialDelivery {
   @@index([deliveryDate])
 }
 
+// An owner's note about a villa (the Owner Notes page). The villa number, location and owner name come from the villa.
+// Open until someone checks it as done; while open, the hourly job
+// reminds the admins and the users who may read owner notes once a day (OWNER_NOTE_REMINDER).
+model OwnerNote {
+  id            String         @id @default(uuid())
+  villaId       String
+  notes         String
+  doneAt        DateTime?
+  version       Int            @default(1)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  villa         Villa          @relation(fields: [villaId], references: [id], onDelete: Restrict)
+  notifications Notification[]
+
+  @@index([villaId])
+  @@index([doneAt])
+}
+
+// A foreman's mission at a villa (the Foreman Missions page). The villa number, location and owner name come from the villa.
+// Open until someone checks it as done; while open, the hourly job reminds the admins and the users who may read foreman
+// missions once a day (FOREMAN_MISSION_REMINDER).
+model ForemanMission {
+  id            String         @id @default(uuid())
+  villaId       String
+  notes         String
+  doneAt        DateTime?
+  version       Int            @default(1)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  villa         Villa          @relation(fields: [villaId], references: [id], onDelete: Restrict)
+  notifications Notification[]
+
+  @@index([villaId])
+  @@index([doneAt])
+}
+
+// How a contractor was paid.
+enum PaymentMethod {
+  CASH
+  CHEQUE
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+}
+
+// A payment to a contractor (the Payments page), for a villa or for the contractor in general. The amount is in KWD fils
+// (3 decimals), never negative. A PAID payment has its paid date; a PENDING one past its due date is overdue and is
+// reminded once a day (PAYMENT_OVERDUE) to the admins and the users who may read payments.
+model ContractorPayment {
+  id            String                  @id @default(uuid())
+  contractorId  String
+  villaId       String?
+  amountMinor   BigInt
+  status        PaymentStatus           @default(PENDING)
+  dueDate       DateTime?               @db.Date
+  paidDate      DateTime?               @db.Date
+  method        PaymentMethod?
+  reference     String?
+  notes         String?
+  version       Int                     @default(1)
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  contractor    Contractor              @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  villa         Villa?                  @relation(fields: [villaId], references: [id], onDelete: Restrict)
+  files         ContractorPaymentFile[]
+  notifications Notification[]
+
+  @@index([contractorId])
+  @@index([villaId])
+  @@index([status, dueDate])
+}
+
+// A receipt or invoice of a payment (PDF, JPG or PNG), kept in the uploads folder under `key`.
+model ContractorPaymentFile {
+  id         String            @id @default(uuid())
+  paymentId  String
+  payment    ContractorPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  key        String
+  name       String
+  mime       String
+  size       Int
+  uploadedAt DateTime          @default(now())
+
+  @@index([paymentId])
+}
+
+// A variation order of a villa (the Variation Orders card of the villa page): its number (unique in the villa), amount in
+// KWD fils, the day it was added, pending or paid, notes, and its PDF files. A villa with variation orders is not deleted.
+model VariationOrder {
+  id          String               @id @default(uuid())
+  villaId     String
+  voNumber    String
+  amountMinor BigInt
+  dateAdded   DateTime             @db.Date
+  status      PaymentStatus        @default(PENDING)
+  notes       String?
+  version     Int                  @default(1)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  villa       Villa                @relation(fields: [villaId], references: [id], onDelete: Restrict)
+  files       VariationOrderFile[]
+
+  @@unique([villaId, voNumber])
+}
+
+// A PDF of a variation order, kept in the uploads folder under `key`.
+model VariationOrderFile {
+  id               String         @id @default(uuid())
+  variationOrderId String
+  variationOrder   VariationOrder @relation(fields: [variationOrderId], references: [id], onDelete: Cascade)
+  key              String
+  name             String
+  mime             String
+  size             Int
+  uploadedAt       DateTime       @default(now())
+
+  @@index([variationOrderId])
+}
+
 model MaintenanceVilla {
   id           String    @id @default(uuid())
   villaNumber  String
@@ -412,6 +536,10 @@ model Villa {
   mewInspectionPassedBy   User?                      @relation("VillaMewInspectionPassedMarker", fields: [mewInspectionPassedById], references: [id], onDelete: SetNull)
   documents               VillaDocument[]
   materialDeliveries      MaterialDelivery[]
+  ownerNotes              OwnerNote[]
+  foremanMissions         ForemanMission[]
+  payments                ContractorPayment[]
+  variationOrders         VariationOrder[]
   materialRequirements    VillaMaterialRequirement[]
   phaseProgress           VillaPhaseProgress[]
   workItems               WorkItem[]
@@ -458,25 +586,30 @@ model VillaPhaseProgress {
 // PHASE) and the CHECK constraints (progress 0 to 100; endDate not before startDate; DONE is exactly 100 and NOT_STARTED
 // exactly 0). createdById is NULL for an item the system made, and when the user is gone.
 model WorkItem {
-  id            String         @id @default(uuid())
-  villaId       String
-  elecPhaseId   String
-  status        WorkStatus     @default(NOT_STARTED)
-  priority      Priority       @default(MEDIUM)
-  progress      Int            @default(0) @db.SmallInt
-  contractorId  String?
-  startDate     DateTime?      @db.Date
-  endDate       DateTime?      @db.Date
-  source        WorkItemSource
-  version       Int            @default(1)
-  createdById   String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  villa         Villa          @relation(fields: [villaId], references: [id], onDelete: Cascade)
-  elecPhase     ElecPhase      @relation(fields: [elecPhaseId], references: [id], onDelete: Restrict)
-  contractor    Contractor?    @relation(fields: [contractorId], references: [id], onDelete: Restrict)
-  createdBy     User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  notifications Notification[]
+  id                  String         @id @default(uuid())
+  villaId             String
+  elecPhaseId         String
+  status              WorkStatus     @default(NOT_STARTED)
+  priority            Priority       @default(MEDIUM)
+  progress            Int            @default(0) @db.SmallInt
+  contractorId        String?
+  startDate           DateTime?      @db.Date
+  endDate             DateTime?      @db.Date
+  source              WorkItemSource
+  version             Int            @default(1)
+  createdById         String?
+  // When the progress was last set (on create, import, or an edit that changed it or moved the work to another phase), and
+  // by whom: what the villa page shows beside the phase. The user is NULL when unknown or gone.
+  progressUpdatedAt   DateTime?
+  progressUpdatedById String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  villa               Villa          @relation(fields: [villaId], references: [id], onDelete: Cascade)
+  elecPhase           ElecPhase      @relation(fields: [elecPhaseId], references: [id], onDelete: Restrict)
+  contractor          Contractor?    @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  createdBy           User?          @relation("WorkItemCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  progressUpdatedBy   User?          @relation("WorkItemProgressUpdater", fields: [progressUpdatedById], references: [id], onDelete: SetNull)
+  notifications       Notification[]
 
   @@index([villaId, status])
   @@index([status])
@@ -484,6 +617,7 @@ model WorkItem {
   @@index([contractorId])
   @@index([elecPhaseId])
   @@index([createdById])
+  @@index([progressUpdatedById])
 }
 
 // The report of one day's work of one contractor. One report per contractor per day: the real UNIQUE index
@@ -551,6 +685,9 @@ enum NotificationKind {
   SMALL_WORK_DUE_SOON
   SMALL_WORK_OVERDUE
   OPEN_WORK_OVERDUE
+  OWNER_NOTE_REMINDER
+  FOREMAN_MISSION_REMINDER
+  PAYMENT_OVERDUE
 }
 
 // One alert about one situation of a small work: the work, the kind and the endDate it was raised for. The unique key makes the
@@ -560,20 +697,29 @@ enum NotificationKind {
 // has been sent; NULL means it still has to be. Deleted with its small work. Who sees it is in NotificationRecipient.
 // About exactly one thing: a small work or an open work (a CHECK constraint keeps one of the two set).
 model Notification {
-  id          String                  @id @default(uuid())
-  kind        NotificationKind
-  smallWorkId String?
-  workItemId  String?
-  endDate     DateTime                @db.Date
-  data        Json
-  emailedAt   DateTime?
-  createdAt   DateTime                @default(now())
-  smallWork   DailySmallWork?         @relation(fields: [smallWorkId], references: [id], onDelete: Cascade)
-  workItem    WorkItem?               @relation(fields: [workItemId], references: [id], onDelete: Cascade)
-  recipients  NotificationRecipient[]
+  id               String                  @id @default(uuid())
+  kind             NotificationKind
+  smallWorkId      String?
+  workItemId       String?
+  ownerNoteId      String?
+  foremanMissionId String?
+  paymentId        String?
+  endDate          DateTime                @db.Date
+  data             Json
+  emailedAt        DateTime?
+  createdAt        DateTime                @default(now())
+  smallWork        DailySmallWork?         @relation(fields: [smallWorkId], references: [id], onDelete: Cascade)
+  workItem         WorkItem?               @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  ownerNote        OwnerNote?              @relation(fields: [ownerNoteId], references: [id], onDelete: Cascade)
+  foremanMission   ForemanMission?         @relation(fields: [foremanMissionId], references: [id], onDelete: Cascade)
+  payment          ContractorPayment?      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  recipients       NotificationRecipient[]
 
   @@unique([smallWorkId, kind, endDate])
   @@unique([workItemId, kind, endDate])
+  @@unique([ownerNoteId, kind, endDate])
+  @@unique([foremanMissionId, kind, endDate])
+  @@unique([paymentId, kind, endDate])
   @@index([createdAt])
 }
 

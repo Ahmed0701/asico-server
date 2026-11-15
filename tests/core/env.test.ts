@@ -34,7 +34,7 @@ describe("environment defaults for exports and uploads", () => {
     const env = envSchema.parse(required);
 
     expect(env.MAX_UPLOAD_BYTES).toBe(25 * 1024 * 1024);
-    expect(env.MAX_DOCUMENTS_PER_VILLA).toBe(10);
+    expect(env.MAX_DOCUMENTS_PER_VILLA).toBe(20);
   });
 });
 

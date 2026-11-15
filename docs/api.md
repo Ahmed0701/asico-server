@@ -104,13 +104,34 @@ All paths are under `/api/v1`. A test (`tests/docs/routes.docs.test.ts`) reads t
 
 ### Maintenance
 
-| Method   | Path               | Access               | Idempotency-Key | If-Match | Purpose                                                                    |
-| -------- | ------------------ | -------------------- | --------------- | -------- | -------------------------------------------------------------------------- |
-| `GET`    | `/maintenance`     | `maintenance:read`   | —               | —        | List the maintenance villas (page, search, sort, `solved=true` or `false`) |
-| `GET`    | `/maintenance/:id` | `maintenance:read`   | —               | —        | One maintenance villa                                                      |
-| `POST`   | `/maintenance`     | `maintenance:create` | optional        | —        | Add a maintenance villa (villa number and location typed by hand)          |
-| `PATCH`  | `/maintenance/:id` | `maintenance:update` | —               | optional | Change it, or check it as solved (`solved: true`) and back                 |
-| `DELETE` | `/maintenance/:id` | `maintenance:delete` | —               | optional | Delete a maintenance villa                                                 |
+| Method   | Path                          | Access                    | Idempotency-Key | If-Match | Purpose                                                                                                                     |
+| -------- | ----------------------------- | ------------------------- | --------------- | -------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/maintenance`                | `maintenance:read`        | —               | —        | List the maintenance villas (page, search, sort, `solved=true` or `false`)                                                  |
+| `GET`    | `/maintenance/:id`            | `maintenance:read`        | —               | —        | One maintenance villa                                                                                                       |
+| `POST`   | `/maintenance`                | `maintenance:create`      | optional        | —        | Add a maintenance villa (villa number and location typed by hand)                                                           |
+| `PATCH`  | `/maintenance/:id`            | `maintenance:update`      | —               | optional | Change it, or check it as solved (`solved: true`) and back                                                                  |
+| `DELETE` | `/maintenance/:id`            | `maintenance:delete`      | —               | optional | Delete a maintenance villa                                                                                                  |
+| `GET`    | `/owner-notes`                | `owner-notes:read`        | —               | —        | List the owner notes (page, search, sort, `villaId`, `done=true` or `false`)                                                |
+| `GET`    | `/foreman-missions`           | `foreman-missions:read`   | —               | —        | List the foreman missions (page, search, sort, `villaId`, `done=true` or `false`)                                           |
+| `GET`    | `/owner-notes/:id`            | `owner-notes:read`        | —               | —        | One owner note                                                                                                              |
+| `GET`    | `/foreman-missions/:id`       | `foreman-missions:read`   | —               | —        | One foreman mission                                                                                                         |
+| `POST`   | `/owner-notes`                | `owner-notes:create`      | optional        | —        | Add an owner note for a villa; reminded daily until done                                                                    |
+| `POST`   | `/foreman-missions`           | `foreman-missions:create` | optional        | —        | Add a foreman mission for a villa; reminded daily until done                                                                |
+| `PATCH`  | `/owner-notes/:id`            | `owner-notes:update`      | —               | optional | Change it, or check it as done (`done: true`) and back                                                                      |
+| `PATCH`  | `/foreman-missions/:id`       | `foreman-missions:update` | —               | optional | Change it, or check it as done (`done: true`) and back                                                                      |
+| `DELETE` | `/owner-notes/:id`            | `owner-notes:delete`      | —               | optional | Delete an owner note (and its reminders)                                                                                    |
+| `DELETE` | `/foreman-missions/:id`       | `foreman-missions:delete` | —               | optional | Delete a foreman mission (and its reminders)                                                                                |
+| `GET`    | `/payments`                   | `payments:read`           | —               | —        | List the payments to contractors (page, search, sort, `status`, `contractorId`, `villaId`, `overdue=true`), with the totals |
+| `GET`    | `/payments/export`            | `payments:read`           | —               | —        | The list as an Excel or PDF file (`format=xlsx` or `pdf`, same filters)                                                     |
+| `GET`    | `/payments/import/template`   | `payments:create`         | —               | —        | The Excel import template                                                                                                   |
+| `POST`   | `/payments/import`            | `payments:create`         | required        | —        | Import payments from Excel (`dryRun=true` checks only)                                                                      |
+| `GET`    | `/payments/:id`               | `payments:read`           | —               | —        | One payment                                                                                                                 |
+| `POST`   | `/payments`                   | `payments:create`         | optional        | —        | Add a payment to a contractor (for a villa or general)                                                                      |
+| `PATCH`  | `/payments/:id`               | `payments:update`         | —               | optional | Change it, or mark it paid (`status: "PAID"`, paid date today unless given) and back                                        |
+| `DELETE` | `/payments/:id`               | `payments:delete`         | —               | optional | Delete a payment, its files and its reminders                                                                               |
+| `POST`   | `/payments/:id/files`         | `payments:update`         | —               | —        | Add receipt or invoice files (multipart `file`, PDF, JPG or PNG, up to 10)                                                  |
+| `GET`    | `/payments/:id/files/:fileId` | `payments:read`           | —               | —        | Show one file (inline)                                                                                                      |
+| `DELETE` | `/payments/:id/files/:fileId` | `payments:update`         | —               | —        | Remove one file                                                                                                             |
 
 ### Materials
 
@@ -169,7 +190,7 @@ Deliveries from the switchgear and cable factories to the villas, each with its 
 | `POST`   | `/villas`                              | `villas:create`     | optional        | —        | Create a villa                                                                                           |
 | `PATCH`  | `/villas/:id`                          | `villas:update`     | —               | optional | Change a villa                                                                                           |
 | `POST`   | `/villas/:id/mew-follow-up`            | `villas:inspection` | optional        | optional | Put a villa on MEW follow up (409 if it already is)                                                      |
-| `DELETE` | `/villas/:id/mew-follow-up`            | `villas:inspection` | optional        | optional | Take a villa off MEW follow up (409 if it is not on it)                                                  |
+| `DELETE` | `/villas/:id/mew-follow-up`            | `villas:inspection` | optional        | optional | Take a villa off MEW follow up (409 if it is not on it); resets its MEW states and inspection day        |
 | `POST`   | `/villas/:id/mew-inspection`           | `villas:inspection` | optional        | optional | Put a villa on MEW inspection (409 if it already is, or its AC or electricity MEW state is not APPROVED) |
 | `DELETE` | `/villas/:id/mew-inspection`           | `villas:inspection` | optional        | optional | Take a villa off MEW inspection (409 if it is not on it)                                                 |
 | `POST`   | `/villas/:id/mew-inspection-passed`    | `villas:inspection` | optional        | optional | Check a villa as passed MEW inspection (409 if it already is)                                            |
@@ -188,6 +209,20 @@ Deliveries from the switchgear and cable factories to the villas, each with its 
 | `POST`   | `/villa-documents/:id/link`     | `villa-documents:download` | —               | —        | A signed link to view or download one document |
 | `GET`    | `/villa-documents/:id/file`     | `public`                   | —               | —        | The file, for a valid signed link (`?token=`)  |
 | `DELETE` | `/villa-documents/:id`          | `villa-documents:delete`   | —               | —        | Delete a document                              |
+
+### Variation orders
+
+The Variation Orders card of the villa page. Seen with `villas:read`, changed with `villas:update`.
+
+| Method   | Path                                  | Access          | Idempotency-Key | If-Match | Purpose                                                                                          |
+| -------- | ------------------------------------- | --------------- | --------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `GET`    | `/villas/:villaId/variation-orders`   | `villas:read`   | —               | —        | The variation orders of a villa (newest date first, no `meta`), with the pending and paid totals |
+| `POST`   | `/villas/:villaId/variation-orders`   | `villas:update` | optional        | —        | Add a variation order (VO number unique in the villa, amount, date added, status, notes)         |
+| `PATCH`  | `/variation-orders/:id`               | `villas:update` | —               | optional | Change it, or mark it paid (`status: "PAID"`) and back                                           |
+| `DELETE` | `/variation-orders/:id`               | `villas:update` | —               | optional | Delete a variation order and its files                                                           |
+| `POST`   | `/variation-orders/:id/files`         | `villas:update` | —               | —        | Add PDF files (multipart `file`, up to 10)                                                       |
+| `GET`    | `/variation-orders/:id/files/:fileId` | `villas:read`   | —               | —        | Show one file (inline)                                                                           |
+| `DELETE` | `/variation-orders/:id/files/:fileId` | `villas:update` | —               | —        | Remove one file                                                                                  |
 
 ### Open works
 

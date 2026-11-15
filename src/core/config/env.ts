@@ -52,7 +52,7 @@ export const envSchema = z
       .int()
       .positive()
       .default(25 * 1024 * 1024),
-    MAX_DOCUMENTS_PER_VILLA: z.coerce.number().int().positive().default(10),
+    MAX_DOCUMENTS_PER_VILLA: z.coerce.number().int().positive().default(20),
     CORS_ORIGINS: z
       .string()
       .default("")

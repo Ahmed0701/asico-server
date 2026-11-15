@@ -1,6 +1,6 @@
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { store } from "../auth/in-memory-auth.repository.js";
+import { pendingVariationOrders, store } from "../auth/in-memory-auth.repository.js";
 import { addEngineer, engineerTables } from "../civil-engineers/in-memory-civil-engineers.repository.js";
 import { phaseTables } from "../elec-phases/in-memory-elec-phases.repository.js";
 import { idempotencyTable } from "../write-safety/in-memory-idempotency.repository.js";
@@ -112,7 +112,9 @@ describe.each([
 
     expect(off.status).toBe(200);
     expect(off.body.data[field]).toBeNull();
-    expect(auditRows().map((row) => row["action"])).toEqual([action, `${action}_undo`]);
+    // Taking a villa off MEW follow-up also resets its MEW states (here APPROVED): one more audited change.
+    const reset = path === "mew-follow-up" ? ["villa.mew_states"] : [];
+    expect(auditRows().map((row) => row["action"])).toEqual([action, `${action}_undo`, ...reset]);
     expect(auditRows()[0]).toMatchObject({
       before: { [`${field}At`]: null },
       after: { [`${field}ById`]: admin.id },
@@ -232,6 +234,83 @@ describe("adding a villa for MEW inspection before both MEW files are approved",
 
     expect(res.status).toBe(200);
     expect(res.body.data.mewInspection).not.toBeNull();
+  });
+});
+
+describe("adding a villa for MEW inspection while a variation order is not paid", () => {
+  const url = () => `/villas/${villa.id}/mew-inspection`;
+
+  it("refuses it with 409 VILLA_VARIATION_ORDERS_PENDING and how many, writes nothing, and allows it once all are paid", async () => {
+    Object.assign(live(), submitted);
+    pendingVariationOrders.set(villa.id, 2);
+
+    const res = await send("post", url());
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe("VILLA_VARIATION_ORDERS_PENDING");
+    expect(res.body.details[0]).toMatchObject({ path: "variationOrders", value: 2 });
+    expect(res.body.message).toMatch(/variation orders/);
+    expect(live().mewInspectionAt).toBeNull();
+    expect(auditRows()).toEqual([]);
+
+    pendingVariationOrders.delete(villa.id);
+    expect((await send("post", url())).status).toBe(200);
+  });
+});
+
+describe("taking a villa off MEW follow-up", () => {
+  const followUp = () => `/villas/${villa.id}/mew-follow-up`;
+
+  it("resets its MEW states to NOT_SUBMITTED and clears the inspection day, audited as a MEW states change", async () => {
+    await send("post", followUp());
+    await send("patch", `/villas/${villa.id}/mew-states`, {
+      body: { mewAcState: "APPROVED", mewElecState: "RUNNING", mewInspectionDate: "2026-12-01" },
+    });
+
+    const off = await send("delete", followUp());
+
+    expect(off.status).toBe(200);
+    expect(off.body.data).toMatchObject({
+      mewFollowUp: null,
+      mewAcState: "NOT_SUBMITTED",
+      mewElecState: "NOT_SUBMITTED",
+      mewInspectionDate: null,
+    });
+    expect(off.headers["etag"]).toBe(`"${live().version}"`);
+    const last = auditRows().at(-1)!;
+    expect(last).toMatchObject({
+      action: "villa.mew_states",
+      before: { mewAcState: "APPROVED", mewElecState: "RUNNING", mewInspectionDate: "2026-12-01" },
+      after: { mewAcState: "NOT_SUBMITTED", mewElecState: "NOT_SUBMITTED", mewInspectionDate: null },
+    });
+  });
+
+  it("writes no MEW states change when they are already clear", async () => {
+    await send("post", followUp());
+    await send("delete", followUp());
+
+    expect(auditRows().map((row) => row["action"])).toEqual([
+      "villa.mew_follow_up",
+      "villa.mew_follow_up_undo",
+    ]);
+    expect(live().version).toBe(3);
+  });
+
+  it("shows the reset villa on the villa page, and a stale If-Match is still refused before anything changes", async () => {
+    await send("post", followUp());
+    await send("patch", `/villas/${villa.id}/mew-states`, { body: { mewAcState: "RUNNING" } });
+
+    const stale = await send("delete", followUp(), { ifMatch: '"1"' });
+    expect(stale.status).toBe(409);
+    expect(live().mewAcState).toBe("RUNNING");
+
+    await send("delete", followUp());
+    const detail = await send("get", `/villas/${villa.id}`);
+    expect(detail.body.data).toMatchObject({
+      mewFollowUp: null,
+      mewAcState: "NOT_SUBMITTED",
+      mewInspectionDate: null,
+    });
   });
 });
 

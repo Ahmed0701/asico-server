@@ -826,7 +826,7 @@ describe("GET and PATCH /me", () => {
       .set(await bearer(admin));
 
     expect(res.body.data.permissions).toEqual([...PERMISSION_CODES]);
-    expect(res.body.data.permissions).toHaveLength(80);
+    expect(res.body.data.permissions).toHaveLength(92);
   });
 
   it("updates the name only, and audits the change", async () => {

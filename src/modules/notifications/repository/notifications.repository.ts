@@ -13,6 +13,9 @@ const select = {
       data: true,
       smallWork: { select: { id: true, villaId: true } },
       workItem: { select: { id: true, villaId: true } },
+      ownerNote: { select: { id: true, villaId: true } },
+      foremanMission: { select: { id: true, villaId: true } },
+      payment: { select: { id: true, villaId: true } },
     },
   },
 } satisfies Prisma.NotificationRecipientSelect;

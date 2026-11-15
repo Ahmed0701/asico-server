@@ -5,6 +5,9 @@ import type {
   Admin,
   DueSmallWork,
   OverdueOpenWork,
+  OwnerNoteToRemind,
+  ForemanMissionToRemind,
+  PaymentToRemind,
   UnsentNotification,
 } from "../../../src/modules/notifications/repository/small-works-alerts.repository.js";
 import { SmallWorksAlertsService } from "../../../src/modules/notifications/service/small-works-alerts.service.js";
@@ -117,7 +120,106 @@ class FakeAlertsRepository {
     return works.length;
   }
 
+  // Owner notes: an open one gets one reminder per day of the zone; a done one gets none.
+  ownerNotes: { id: string; villaNumber: string; ownerName: string; notes: string; done: boolean }[] = [];
+  ownerNoteReminders: { noteId: string; day: string; recipients: readonly string[]; description: string }[] =
+    [];
+  ownerNoteRecipients: string[] = ["admin-1", "owner-notes-reader"];
+
+  async findOwnerNotesToRemind(today: string): Promise<OwnerNoteToRemind[]> {
+    return this.ownerNotes
+      .filter((note) => !note.done)
+      .filter((note) => !this.ownerNoteReminders.some((one) => one.noteId === note.id && one.day === today))
+      .map(({ id, villaNumber, ownerName, notes }) => ({ id, villaNumber, ownerName, notes }));
+  }
+
+  async createOwnerNoteNotifications(
+    notes: readonly OwnerNoteToRemind[],
+    today: string,
+    recipientIds: readonly string[],
+  ): Promise<number> {
+    for (const note of notes) {
+      this.ownerNoteReminders.push({
+        noteId: note.id,
+        day: today,
+        recipients: recipientIds,
+        description: note.notes,
+      });
+    }
+    return notes.length;
+  }
+  // Foreman missions: an open one gets one reminder per day of the zone; a done one gets none.
+  foremanMissions: { id: string; villaNumber: string; ownerName: string; notes: string; done: boolean }[] =
+    [];
+  foremanMissionReminders: {
+    noteId: string;
+    day: string;
+    recipients: readonly string[];
+    description: string;
+  }[] = [];
+  foremanMissionRecipients: string[] = ["admin-1", "foreman-missions-reader"];
+
+  async findForemanMissionsToRemind(today: string): Promise<ForemanMissionToRemind[]> {
+    return this.foremanMissions
+      .filter((note) => !note.done)
+      .filter(
+        (note) => !this.foremanMissionReminders.some((one) => one.noteId === note.id && one.day === today),
+      )
+      .map(({ id, villaNumber, ownerName, notes }) => ({ id, villaNumber, ownerName, notes }));
+  }
+
+  async createForemanMissionNotifications(
+    notes: readonly ForemanMissionToRemind[],
+    today: string,
+    recipientIds: readonly string[],
+  ): Promise<number> {
+    for (const note of notes) {
+      this.foremanMissionReminders.push({
+        noteId: note.id,
+        day: today,
+        recipients: recipientIds,
+        description: note.notes,
+      });
+    }
+    return notes.length;
+  }
+
+  // Payments: a pending one past its due date gets one reminder per day of the zone; a paid one gets none.
+  payments: { id: string; dueDate: string; status: "PENDING" | "PAID"; amountMinor: bigint }[] = [];
+  paymentReminders: { paymentId: string; day: string; recipients: readonly string[] }[] = [];
+  paymentRecipients: string[] = ["admin-1", "payments-reader"];
+
+  async findPaymentsToRemind(today: string): Promise<PaymentToRemind[]> {
+    return this.payments
+      .filter((payment) => payment.status === "PENDING" && payment.dueDate < today)
+      .filter(
+        (payment) => !this.paymentReminders.some((one) => one.paymentId === payment.id && one.day === today),
+      )
+      .map((payment) => ({
+        id: payment.id,
+        dueDate: day(payment.dueDate),
+        amountMinor: payment.amountMinor,
+        reference: null,
+        contractorName: "Nile Builders",
+        villaNumber: null,
+      }));
+  }
+
+  async createPaymentNotifications(
+    payments: readonly PaymentToRemind[],
+    today: string,
+    recipientIds: readonly string[],
+  ): Promise<number> {
+    for (const payment of payments) {
+      this.paymentReminders.push({ paymentId: payment.id, day: today, recipients: recipientIds });
+    }
+    return payments.length;
+  }
+
   async recipientIds(_db?: unknown, permission?: string): Promise<string[]> {
+    if (permission === "payments:read") return this.paymentRecipients;
+    if (permission === "owner-notes:read") return this.ownerNoteRecipients;
+    if (permission === "foreman-missions:read") return this.foremanMissionRecipients;
     return permission === "open-works:read" ? this.openWorkRecipients : this.recipients;
   }
 
@@ -222,7 +324,14 @@ describe("raising notifications", () => {
 
     expect(result).toEqual({
       skipped: false,
-      raised: { dueSoon: 0, overdue: 0, openWorksOverdue: 0 },
+      raised: {
+        dueSoon: 0,
+        overdue: 0,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      },
       digest: { notifications: 0, sent: 0, failed: 0 },
     });
     expect(repository.notifications).toEqual([]);
@@ -233,7 +342,14 @@ describe("raising notifications", () => {
 
     const result = await service().run();
 
-    expect(result.raised).toEqual({ dueSoon: 1, overdue: 0, openWorksOverdue: 0 });
+    expect(result.raised).toEqual({
+      dueSoon: 1,
+      overdue: 0,
+      openWorksOverdue: 0,
+      ownerNoteReminders: 0,
+      foremanMissionReminders: 0,
+      paymentsOverdue: 0,
+    });
     expect(repository.notifications).toMatchObject([{ kind: "SMALL_WORK_DUE_SOON", endDate: "2026-11-05" }]);
   });
 
@@ -243,7 +359,14 @@ describe("raising notifications", () => {
 
     const result = await service().run();
 
-    expect(result.raised).toEqual({ dueSoon: 0, overdue: 1, openWorksOverdue: 0 });
+    expect(result.raised).toEqual({
+      dueSoon: 0,
+      overdue: 1,
+      openWorksOverdue: 0,
+      ownerNoteReminders: 0,
+      foremanMissionReminders: 0,
+      paymentsOverdue: 0,
+    });
     expect(repository.notifications).toMatchObject([{ kind: "SMALL_WORK_OVERDUE" }]);
   });
 
@@ -253,7 +376,14 @@ describe("raising notifications", () => {
 
     for (const iso of ["2026-11-05T13:00:00.000Z", "2026-11-05T14:00:00.000Z", "2026-11-05T20:59:00.000Z"]) {
       now = new Date(iso);
-      expect((await service().run()).raised).toEqual({ dueSoon: 0, overdue: 0, openWorksOverdue: 0 });
+      expect((await service().run()).raised).toEqual({
+        dueSoon: 0,
+        overdue: 0,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      });
     }
     expect(repository.notifications).toHaveLength(1);
   });
@@ -265,7 +395,14 @@ describe("raising notifications", () => {
 
     const result = await service().run();
 
-    expect(result.raised).toEqual({ dueSoon: 0, overdue: 1, openWorksOverdue: 0 });
+    expect(result.raised).toEqual({
+      dueSoon: 0,
+      overdue: 1,
+      openWorksOverdue: 0,
+      ownerNoteReminders: 0,
+      foremanMissionReminders: 0,
+      paymentsOverdue: 0,
+    });
     expect(repository.notifications.map((one) => one.kind)).toEqual([
       "SMALL_WORK_DUE_SOON",
       "SMALL_WORK_OVERDUE",
@@ -277,7 +414,14 @@ describe("raising notifications", () => {
 
     const result = await service().run();
 
-    expect(result.raised).toEqual({ dueSoon: 0, overdue: 1, openWorksOverdue: 0 });
+    expect(result.raised).toEqual({
+      dueSoon: 0,
+      overdue: 1,
+      openWorksOverdue: 0,
+      ownerNoteReminders: 0,
+      foremanMissionReminders: 0,
+      paymentsOverdue: 0,
+    });
   });
 
   it("ignores a work that is DONE", async () => {
@@ -286,7 +430,14 @@ describe("raising notifications", () => {
 
     const result = await service().run();
 
-    expect(result.raised).toEqual({ dueSoon: 0, overdue: 0, openWorksOverdue: 0 });
+    expect(result.raised).toEqual({
+      dueSoon: 0,
+      overdue: 0,
+      openWorksOverdue: 0,
+      ownerNoteReminders: 0,
+      foremanMissionReminders: 0,
+      paymentsOverdue: 0,
+    });
     expect(sent).toEqual([]);
   });
 
@@ -298,7 +449,14 @@ describe("raising notifications", () => {
 
     const result = await service().run();
 
-    expect(result.raised).toEqual({ dueSoon: 1, overdue: 0, openWorksOverdue: 0 });
+    expect(result.raised).toEqual({
+      dueSoon: 1,
+      overdue: 0,
+      openWorksOverdue: 0,
+      ownerNoteReminders: 0,
+      foremanMissionReminders: 0,
+      paymentsOverdue: 0,
+    });
     expect(repository.notifications.map((one) => one.endDate)).toEqual(["2026-11-05", "2026-11-06"]);
   });
 
@@ -306,14 +464,35 @@ describe("raising notifications", () => {
     const work = addWork();
     await service().run();
     work.status = "DONE";
-    expect((await service().run()).raised).toEqual({ dueSoon: 0, overdue: 0, openWorksOverdue: 0 });
+    expect((await service().run()).raised).toEqual({
+      dueSoon: 0,
+      overdue: 0,
+      openWorksOverdue: 0,
+      ownerNoteReminders: 0,
+      foremanMissionReminders: 0,
+      paymentsOverdue: 0,
+    });
     work.status = "PENDING";
-    expect((await service().run()).raised).toEqual({ dueSoon: 0, overdue: 0, openWorksOverdue: 0 });
+    expect((await service().run()).raised).toEqual({
+      dueSoon: 0,
+      overdue: 0,
+      openWorksOverdue: 0,
+      ownerNoteReminders: 0,
+      foremanMissionReminders: 0,
+      paymentsOverdue: 0,
+    });
     work.endDate = "2026-11-04";
 
     const result = await service().run();
 
-    expect(result.raised).toEqual({ dueSoon: 0, overdue: 1, openWorksOverdue: 0 });
+    expect(result.raised).toEqual({
+      dueSoon: 0,
+      overdue: 1,
+      openWorksOverdue: 0,
+      ownerNoteReminders: 0,
+      foremanMissionReminders: 0,
+      paymentsOverdue: 0,
+    });
   });
 
   it("passes every recipient to the repository", async () => {
@@ -392,7 +571,14 @@ describe("the lock", () => {
 
     expect(result).toEqual({
       skipped: true,
-      raised: { dueSoon: 0, overdue: 0, openWorksOverdue: 0 },
+      raised: {
+        dueSoon: 0,
+        overdue: 0,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      },
       digest: { notifications: 0, sent: 0, failed: 0 },
     });
     expect(repository.notifications).toEqual([]);
@@ -463,7 +649,14 @@ describe("the digest email", () => {
     failFor.clear();
     const second = await service().run();
 
-    expect(second.raised).toEqual({ dueSoon: 0, overdue: 0, openWorksOverdue: 0 });
+    expect(second.raised).toEqual({
+      dueSoon: 0,
+      overdue: 0,
+      openWorksOverdue: 0,
+      ownerNoteReminders: 0,
+      foremanMissionReminders: 0,
+      paymentsOverdue: 0,
+    });
     expect(second.digest).toEqual({ notifications: 1, sent: 1, failed: 0 });
     expect(repository.notifications[0]!.emailedAt).not.toBeNull();
   });
@@ -528,5 +721,145 @@ describe("the digest email", () => {
     expect(at("Overdue (1)")).toBeLessThan(at("P-OVER"));
     expect(at("P-OVER")).toBeLessThan(at("Due soon (1)"));
     expect(at("Due soon (1)")).toBeLessThan(at("P-SOON"));
+  });
+});
+
+describe("owner note reminders", () => {
+  const addNote = (done = false) => {
+    const note = {
+      id: `n-${repository.ownerNotes.length + 1}`,
+      villaNumber: "V-9",
+      ownerName: "Abu Khaled",
+      notes: "Call the owner about the meter box",
+      done,
+    };
+    repository.ownerNotes.push(note);
+    return note;
+  };
+
+  it("reminds each open note once a day, to the admins and to who may read owner notes", async () => {
+    addNote();
+    addNote();
+
+    const first = await service().run();
+    const again = await service().run();
+
+    expect(first.raised.ownerNoteReminders).toBe(2);
+    expect(again.raised.ownerNoteReminders).toBe(0);
+    expect(repository.ownerNoteReminders.map((one) => one.recipients)).toEqual([
+      ["admin-1", "owner-notes-reader"],
+      ["admin-1", "owner-notes-reader"],
+    ]);
+  });
+
+  it("reminds again the next day, and never a note checked as done", async () => {
+    const open = addNote();
+    addNote(true);
+    await service().run();
+
+    now = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const nextDay = await service().run();
+
+    expect(nextDay.raised.ownerNoteReminders).toBe(1);
+    expect(new Set(repository.ownerNoteReminders.map((one) => one.noteId))).toEqual(new Set([open.id]));
+    expect(new Set(repository.ownerNoteReminders.map((one) => one.day)).size).toBe(2);
+  });
+
+  it("does nothing while another instance holds the lock, and emails no owner note", async () => {
+    addNote();
+    repository.locked = false;
+
+    expect((await service().run()).raised.ownerNoteReminders).toBe(0);
+
+    repository.locked = true;
+    const result = await service().run();
+    expect(result.raised.ownerNoteReminders).toBe(1);
+    expect(result.digest.notifications).toBe(0);
+  });
+});
+
+describe("foreman mission reminders", () => {
+  const addNote = (done = false) => {
+    const note = {
+      id: `n-${repository.foremanMissions.length + 1}`,
+      villaNumber: "V-9",
+      ownerName: "Abu Khaled",
+      notes: "Call the owner about the meter box",
+      done,
+    };
+    repository.foremanMissions.push(note);
+    return note;
+  };
+
+  it("reminds each open note once a day, to the admins and to who may read foreman missions", async () => {
+    addNote();
+    addNote();
+
+    const first = await service().run();
+    const again = await service().run();
+
+    expect(first.raised.foremanMissionReminders).toBe(2);
+    expect(again.raised.foremanMissionReminders).toBe(0);
+    expect(repository.foremanMissionReminders.map((one) => one.recipients)).toEqual([
+      ["admin-1", "foreman-missions-reader"],
+      ["admin-1", "foreman-missions-reader"],
+    ]);
+  });
+
+  it("reminds again the next day, and never a note checked as done", async () => {
+    const open = addNote();
+    addNote(true);
+    await service().run();
+
+    now = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const nextDay = await service().run();
+
+    expect(nextDay.raised.foremanMissionReminders).toBe(1);
+    expect(new Set(repository.foremanMissionReminders.map((one) => one.noteId))).toEqual(new Set([open.id]));
+    expect(new Set(repository.foremanMissionReminders.map((one) => one.day)).size).toBe(2);
+  });
+
+  it("does nothing while another instance holds the lock, and emails no foreman mission", async () => {
+    addNote();
+    repository.locked = false;
+
+    expect((await service().run()).raised.foremanMissionReminders).toBe(0);
+
+    repository.locked = true;
+    const result = await service().run();
+    expect(result.raised.foremanMissionReminders).toBe(1);
+    expect(result.digest.notifications).toBe(0);
+  });
+});
+
+describe("overdue payment reminders", () => {
+  it("reminds each pending payment past its due date once a day, to the admins and who may read payments", async () => {
+    // IN_WINDOW is 2026-11-05 in Kuwait.
+    repository.payments.push(
+      { id: "p-late", dueDate: "2026-11-04", status: "PENDING", amountMinor: 1500n },
+      { id: "p-today", dueDate: "2026-11-05", status: "PENDING", amountMinor: 900n },
+      { id: "p-paid", dueDate: "2026-10-01", status: "PAID", amountMinor: 700n },
+    );
+
+    const first = await service().run();
+    const again = await service().run();
+
+    expect(first.raised.paymentsOverdue).toBe(1);
+    expect(again.raised.paymentsOverdue).toBe(0);
+    expect(repository.paymentReminders).toEqual([
+      { paymentId: "p-late", day: "2026-11-05", recipients: ["admin-1", "payments-reader"] },
+    ]);
+  });
+
+  it("reminds again the next day while it stays pending, and emails no payment", async () => {
+    repository.payments.push({ id: "p-late", dueDate: "2026-11-01", status: "PENDING", amountMinor: 1500n });
+    await service().run();
+
+    now = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const nextDay = await service().run();
+
+    expect(nextDay.raised.paymentsOverdue).toBe(1);
+    expect(nextDay.digest.notifications).toBe(0);
+    expect(repository.paymentReminders.map((one) => one.day)).toEqual(["2026-11-05", "2026-11-06"]);
   });
 });

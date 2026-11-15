@@ -391,7 +391,7 @@ describe("POST /villas/:villaId/documents", () => {
 
     it("the 25 MB size limit and the 10 documents per villa come from the environment and are configurable", () => {
       expect(original.MAX_UPLOAD_BYTES).toBe(25 * 1024 * 1024);
-      expect(original.MAX_DOCUMENTS_PER_VILLA).toBe(10);
+      expect(original.MAX_DOCUMENTS_PER_VILLA).toBe(20);
     });
 
     it("a villa that already has the maximum number of documents: 409 VILLA_DOCUMENT_LIMIT, nothing kept", async () => {

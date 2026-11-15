@@ -18,6 +18,9 @@ import type {
   DailyCounterRow,
   LabourCounterRow,
   MaintenanceCounterRow,
+  OwnerNoteCounterRow,
+  PaymentCounterRow,
+  ForemanMissionCounterRow,
   OpenWorkCounterRow,
   OverdueOpenWorkRow,
   ProgressCounterRow,
@@ -48,8 +51,11 @@ export type SummaryParts = {
   delayedSmallWorks: { counters: SmallWorkCounterRow } | null;
   siteReports: SiteReportCounterRow | null;
   labour: LabourCounterRow | null;
-  totalLabour: { total: bigint | number } | null;
+  totalLabour: { today: bigint | number; yesterday: bigint | number } | null;
   maintenance: MaintenanceCounterRow | null;
+  ownerNotes: OwnerNoteCounterRow | null;
+  payments: PaymentCounterRow | null;
+  foremanMissions: ForemanMissionCounterRow | null;
 };
 
 const toDaily = (row: DailyCounterRow): DailyFiguresDto => ({
@@ -144,7 +150,10 @@ export function toSummaryDto(
           : averageProgress(toNumber(siteReports.ratingSum), toNumber(siteReports.total)),
     },
     labour: parts.labour && toDaily(parts.labour),
-    totalLabour: parts.totalLabour && { total: toNumber(parts.totalLabour.total) },
+    totalLabour: parts.totalLabour && {
+      today: toNumber(parts.totalLabour.today),
+      yesterday: toNumber(parts.totalLabour.yesterday),
+    },
     delayedSmallWorks: parts.delayedSmallWorks && {
       overdue: toNumber(parts.delayedSmallWorks.counters.overdue),
       dueSoon: toNumber(parts.delayedSmallWorks.counters.dueSoon),
@@ -152,6 +161,21 @@ export function toSummaryDto(
     maintenance: parts.maintenance && {
       open: toNumber(parts.maintenance.open),
       solved: toNumber(parts.maintenance.solved),
+    },
+    ownerNotes: parts.ownerNotes && {
+      open: toNumber(parts.ownerNotes.open),
+      done: toNumber(parts.ownerNotes.done),
+    },
+    foremanMissions: parts.foremanMissions && {
+      open: toNumber(parts.foremanMissions.open),
+      done: toNumber(parts.foremanMissions.done),
+    },
+    payments: parts.payments && {
+      pendingCount: toNumber(parts.payments.pendingCount),
+      pendingMinor: toNumber(parts.payments.pendingMinor),
+      overdueCount: toNumber(parts.payments.overdueCount),
+      overdueMinor: toNumber(parts.payments.overdueMinor),
+      paidThisMonthMinor: toNumber(parts.payments.paidThisMonthMinor),
     },
     generatedAt: generatedAt.toISOString(),
   };

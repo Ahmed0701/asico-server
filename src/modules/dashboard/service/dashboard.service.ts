@@ -92,9 +92,12 @@ export class DashboardService {
           may("delayedSmallWorks") && smallWorkCounters ? { counters: smallWorkCounters } : null,
         siteReports: may("siteReports") ? await this.repository.siteReportCounters(db) : null,
         labour: may("labour") && labourCounters ? labourCounters : null,
-        // The workers written on the labour daily reports, all dates.
-        totalLabour: may("totalLabour") ? await this.repository.dailyReportWorkers(db) : null,
+        // The workers written on the labour daily reports, today and yesterday.
+        totalLabour: may("totalLabour") ? await this.repository.dailyReportWorkers(range, db) : null,
         maintenance: may("maintenance") ? await this.repository.maintenanceCounters(db) : null,
+        ownerNotes: may("ownerNotes") ? await this.repository.ownerNoteCounters(db) : null,
+        foremanMissions: may("foremanMissions") ? await this.repository.foremanMissionCounters(db) : null,
+        payments: may("payments") ? await this.repository.paymentCounters(window.today, db) : null,
       };
     });
     return toSummaryDto(parts, now, { window, policy: this.policy });

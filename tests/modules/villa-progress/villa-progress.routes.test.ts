@@ -642,7 +642,7 @@ describe("what the villas show", () => {
 
     // The first phase is done (20); the second, at 50, adds nothing yet.
     expect(res.body.data).toMatchObject({ phaseCount: 5, progress: 20 });
-    expect(res.body.data.phases).toEqual([
+    expect(res.body.data.phases).toMatchObject([
       { elecPhaseId: first().id, name: "Ceiling Piping", order: 1, progress: 100, state: "DONE", version: 2 },
       {
         elecPhaseId: second().id,

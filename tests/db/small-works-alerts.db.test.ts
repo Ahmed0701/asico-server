@@ -114,7 +114,14 @@ describe.skipIf(!RUN)("the small work alerts on a real database (scratch schema)
 
       const result = await service().run();
 
-      expect(result.raised).toEqual({ dueSoon: 1, overdue: 0, openWorksOverdue: 0 });
+      expect(result.raised).toEqual({
+        dueSoon: 1,
+        overdue: 0,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      });
       expect(await notifications()).toMatchObject([
         { smallWorkId: id, kind: "SMALL_WORK_DUE_SOON", endDate: "2026-11-05" },
       ]);
@@ -131,7 +138,14 @@ describe.skipIf(!RUN)("the small work alerts on a real database (scratch schema)
       await addWork();
       now = new Date("2026-11-05T12:59:00.000Z");
 
-      expect((await service().run()).raised).toEqual({ dueSoon: 0, overdue: 0, openWorksOverdue: 0 });
+      expect((await service().run()).raised).toEqual({
+        dueSoon: 0,
+        overdue: 0,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      });
     });
 
     it("raises OVERDUE from the deadline, and a DUE_SOON that came first stays beside it", async () => {
@@ -141,7 +155,14 @@ describe.skipIf(!RUN)("the small work alerts on a real database (scratch schema)
 
       const result = await service().run();
 
-      expect(result.raised).toEqual({ dueSoon: 0, overdue: 1, openWorksOverdue: 0 });
+      expect(result.raised).toEqual({
+        dueSoon: 0,
+        overdue: 1,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      });
       expect((await notifications()).map((one) => one.kind).sort()).toEqual([
         "SMALL_WORK_DUE_SOON",
         "SMALL_WORK_OVERDUE",
@@ -152,7 +173,14 @@ describe.skipIf(!RUN)("the small work alerts on a real database (scratch schema)
       await addWork({ status: "DONE" });
       await addWork({ status: "DONE", endDate: "2026-01-01" });
 
-      expect((await service().run()).raised).toEqual({ dueSoon: 0, overdue: 0, openWorksOverdue: 0 });
+      expect((await service().run()).raised).toEqual({
+        dueSoon: 0,
+        overdue: 0,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      });
       expect(await notifications()).toEqual([]);
     });
 
@@ -187,7 +215,14 @@ describe.skipIf(!RUN)("the small work alerts on a real database (scratch schema)
         "2026-11-05T20:59:00.000Z",
       ]) {
         now = new Date(iso);
-        expect((await service().run()).raised).toEqual({ dueSoon: 0, overdue: 0, openWorksOverdue: 0 });
+        expect((await service().run()).raised).toEqual({
+          dueSoon: 0,
+          overdue: 0,
+          openWorksOverdue: 0,
+          ownerNoteReminders: 0,
+          foremanMissionReminders: 0,
+          paymentsOverdue: 0,
+        });
       }
       expect(await notifications()).toHaveLength(1);
     });
@@ -199,7 +234,14 @@ describe.skipIf(!RUN)("the small work alerts on a real database (scratch schema)
 
       const result = await service().run();
 
-      expect(result.raised).toEqual({ dueSoon: 1, overdue: 0, openWorksOverdue: 0 });
+      expect(result.raised).toEqual({
+        dueSoon: 1,
+        overdue: 0,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      });
       expect(await notifications()).toHaveLength(2);
     });
 
@@ -208,15 +250,43 @@ describe.skipIf(!RUN)("the small work alerts on a real database (scratch schema)
       await service().run();
       await q(`UPDATE "DailySmallWork" SET "endDate"='2026-11-06' WHERE "id"=$1`, [id]);
       now = new Date("2026-11-06T13:00:00.000Z");
-      expect((await service().run()).raised).toEqual({ dueSoon: 1, overdue: 0, openWorksOverdue: 0 });
+      expect((await service().run()).raised).toEqual({
+        dueSoon: 1,
+        overdue: 0,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      });
 
       await q(`UPDATE "DailySmallWork" SET "status"='DONE' WHERE "id"=$1`, [id]);
-      expect((await service().run()).raised).toEqual({ dueSoon: 0, overdue: 0, openWorksOverdue: 0 });
+      expect((await service().run()).raised).toEqual({
+        dueSoon: 0,
+        overdue: 0,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      });
       await q(`UPDATE "DailySmallWork" SET "status"='PENDING' WHERE "id"=$1`, [id]);
-      expect((await service().run()).raised).toEqual({ dueSoon: 0, overdue: 0, openWorksOverdue: 0 });
+      expect((await service().run()).raised).toEqual({
+        dueSoon: 0,
+        overdue: 0,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      });
       await q(`UPDATE "DailySmallWork" SET "endDate"='2026-11-04' WHERE "id"=$1`, [id]);
 
-      expect((await service().run()).raised).toEqual({ dueSoon: 0, overdue: 1, openWorksOverdue: 0 });
+      expect((await service().run()).raised).toEqual({
+        dueSoon: 0,
+        overdue: 1,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      });
       expect(await notifications()).toHaveLength(3);
     });
 
@@ -292,7 +362,14 @@ describe.skipIf(!RUN)("the small work alerts on a real database (scratch schema)
 
       const second = await service().run();
 
-      expect(second.raised).toEqual({ dueSoon: 0, overdue: 0, openWorksOverdue: 0 });
+      expect(second.raised).toEqual({
+        dueSoon: 0,
+        overdue: 0,
+        openWorksOverdue: 0,
+        ownerNoteReminders: 0,
+        foremanMissionReminders: 0,
+        paymentsOverdue: 0,
+      });
       expect(second.digest).toEqual({ notifications: 1, sent: 1, failed: 0 });
     });
 
@@ -404,6 +481,156 @@ describe.skipIf(!RUN)("the small work alerts on a real database (scratch schema)
       expect(await copiesOf("temp")).toHaveLength(0);
       expect(await copiesOf("reader")).toHaveLength(1);
       expect(await notifications()).toHaveLength(1);
+    });
+  });
+
+  describe("owner note reminders", () => {
+    const reminders = async () =>
+      (
+        await q(
+          `SELECT "ownerNoteId","endDate"::text AS "endDate","emailedAt" FROM "Notification"
+           WHERE "kind" = 'OWNER_NOTE_REMINDER' ORDER BY "endDate","ownerNoteId"`,
+        )
+      ).rows as { ownerNoteId: string; endDate: string; emailedAt: Date | null }[];
+
+    beforeAll(async () => {
+      // The reminder names the villa's owner.
+      await q(`UPDATE "Villa" SET "ownerName" = 'Abu Khaled' WHERE "id" = 'v1'`);
+      // The migration created the owner-notes:read permission row.
+      await q(
+        `INSERT INTO "UserPermission" ("userId","permissionId")
+         SELECT 'other', "id" FROM "Permission" WHERE "code" = 'owner-notes:read'`,
+      );
+    });
+
+    beforeEach(async () => {
+      await q(`DELETE FROM "OwnerNote"`);
+      await q(
+        `INSERT INTO "OwnerNote" ("id","villaId","notes","doneAt","updatedAt") VALUES
+         ('on-open','v1','Move the meter box',NULL,now()),
+         ('on-done','v2','Paint the gate',now(),now())`,
+      );
+    });
+
+    it("reminds each open note once per Kuwait day, to the admins and who may read owner notes, never by email", async () => {
+      const first = await service().run();
+      const again = await service().run();
+
+      expect(first.raised.ownerNoteReminders).toBe(1);
+      expect(again.raised.ownerNoteReminders).toBe(0);
+      expect(await reminders()).toEqual([{ ownerNoteId: "on-open", endDate: "2026-11-05", emailedAt: null }]);
+      const reminderCopies = async (userId: string) =>
+        (
+          await q(
+            `SELECT r."notificationId" FROM "NotificationRecipient" r JOIN "Notification" n ON n."id" = r."notificationId"
+             WHERE r."userId" = $1 AND n."kind" = 'OWNER_NOTE_REMINDER'`,
+            [userId],
+          )
+        ).rows;
+      expect(await reminderCopies("admin1")).toHaveLength(1);
+      expect(await reminderCopies("other")).toHaveLength(1);
+      expect(await reminderCopies("reader")).toHaveLength(0);
+      expect(sent).toEqual([]);
+    });
+
+    it("reminds again the next Kuwait day, and stops once the note is checked as done", async () => {
+      await service().run();
+      // 2026-11-05T21:00Z is already 2026-11-06 in Kuwait.
+      now = PAST_DEADLINE;
+      expect((await service().run()).raised.ownerNoteReminders).toBe(1);
+
+      await q(`UPDATE "OwnerNote" SET "doneAt" = now() WHERE "id" = 'on-open'`);
+      now = new Date("2026-11-07T09:00:00.000Z");
+      expect((await service().run()).raised.ownerNoteReminders).toBe(0);
+      expect((await reminders()).map((one) => one.endDate)).toEqual(["2026-11-05", "2026-11-06"]);
+    });
+
+    it("shows in the feed as an owner note, with the owner and the note, and goes with the note", async () => {
+      await service().run();
+
+      const page = await feed.list({ id: "other", role: "EMPLOYEE" }, { page: 1, limit: 20 });
+      const reminder = page.items.find((one) => one.kind === "OWNER_NOTE_REMINDER")!;
+      expect(reminder.entity).toEqual({ type: "OWNER_NOTE", id: "on-open", villaId: "v1" });
+      expect(reminder.body.en).toBe("Villa P-001 (Abu Khaled): Move the meter box");
+      expect(reminder.title.ar).toBe("تذكير بملاحظة مالك");
+
+      await q(`DELETE FROM "OwnerNote" WHERE "id" = 'on-open'`);
+      expect(await reminders()).toEqual([]);
+    });
+  });
+
+  describe("foreman mission reminders", () => {
+    const reminders = async () =>
+      (
+        await q(
+          `SELECT "foremanMissionId","endDate"::text AS "endDate","emailedAt" FROM "Notification"
+           WHERE "kind" = 'FOREMAN_MISSION_REMINDER' ORDER BY "endDate","foremanMissionId"`,
+        )
+      ).rows as { foremanMissionId: string; endDate: string; emailedAt: Date | null }[];
+
+    beforeAll(async () => {
+      // The migration created the foreman-missions:read permission row.
+      await q(
+        `INSERT INTO "UserPermission" ("userId","permissionId")
+         SELECT 'other', "id" FROM "Permission" WHERE "code" = 'foreman-missions:read'`,
+      );
+    });
+
+    beforeEach(async () => {
+      await q(`DELETE FROM "ForemanMission"`);
+      await q(
+        `INSERT INTO "ForemanMission" ("id","villaId","notes","doneAt","updatedAt") VALUES
+         ('fm-open','v1','Move the meter box',NULL,now()),
+         ('fm-done','v2','Paint the gate',now(),now())`,
+      );
+    });
+
+    it("reminds each open note once per Kuwait day, to the admins and who may read foreman missions, never by email", async () => {
+      const first = await service().run();
+      const again = await service().run();
+
+      expect(first.raised.foremanMissionReminders).toBe(1);
+      expect(again.raised.foremanMissionReminders).toBe(0);
+      expect(await reminders()).toEqual([
+        { foremanMissionId: "fm-open", endDate: "2026-11-05", emailedAt: null },
+      ]);
+      const reminderCopies = async (userId: string) =>
+        (
+          await q(
+            `SELECT r."notificationId" FROM "NotificationRecipient" r JOIN "Notification" n ON n."id" = r."notificationId"
+             WHERE r."userId" = $1 AND n."kind" = 'FOREMAN_MISSION_REMINDER'`,
+            [userId],
+          )
+        ).rows;
+      expect(await reminderCopies("admin1")).toHaveLength(1);
+      expect(await reminderCopies("other")).toHaveLength(1);
+      expect(await reminderCopies("reader")).toHaveLength(0);
+      expect(sent).toEqual([]);
+    });
+
+    it("reminds again the next Kuwait day, and stops once the note is checked as done", async () => {
+      await service().run();
+      // 2026-11-05T21:00Z is already 2026-11-06 in Kuwait.
+      now = PAST_DEADLINE;
+      expect((await service().run()).raised.foremanMissionReminders).toBe(1);
+
+      await q(`UPDATE "ForemanMission" SET "doneAt" = now() WHERE "id" = 'fm-open'`);
+      now = new Date("2026-11-07T09:00:00.000Z");
+      expect((await service().run()).raised.foremanMissionReminders).toBe(0);
+      expect((await reminders()).map((one) => one.endDate)).toEqual(["2026-11-05", "2026-11-06"]);
+    });
+
+    it("shows in the feed as a foreman mission, with the owner and the note, and goes with the note", async () => {
+      await service().run();
+
+      const page = await feed.list({ id: "other", role: "EMPLOYEE" }, { page: 1, limit: 20 });
+      const reminder = page.items.find((one) => one.kind === "FOREMAN_MISSION_REMINDER")!;
+      expect(reminder.entity).toEqual({ type: "FOREMAN_MISSION", id: "fm-open", villaId: "v1" });
+      expect(reminder.body.en).toBe("Villa P-001 (Abu Khaled): Move the meter box");
+      expect(reminder.title.ar).toBe("تذكير بمهمة فورمن");
+
+      await q(`DELETE FROM "ForemanMission" WHERE "id" = 'fm-open'`);
+      expect(await reminders()).toEqual([]);
     });
   });
 });

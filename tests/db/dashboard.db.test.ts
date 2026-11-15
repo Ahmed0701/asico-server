@@ -123,7 +123,7 @@ describe.skipIf(!RUN)("the dashboard on a real database (scratch schema)", () =>
       smallWorks: { pending: 0, dueSoon: 0, overdue: 0, urgent: [] },
       siteReports: { count: 0, averageRating: null },
       labour: { today: 0, last7Days: 0 },
-      totalLabour: { total: 0 },
+      totalLabour: { today: 0, yesterday: 0 },
       delayedSmallWorks: { overdue: 0, dueSoon: 0 },
     });
   });
@@ -193,9 +193,16 @@ describe.skipIf(!RUN)("the dashboard on a real database (scratch schema)", () =>
     const { labour: figures } = await service().summary(ADMIN);
 
     expect(figures).toEqual({ today: 65, last7Days: 72 });
-    // The total labour card adds up the workers count of the labour daily reports (all dates), not the labour rows.
-    const reports = await q(`SELECT COALESCE(sum("workersCount"), 0)::int AS "total" FROM "DailyReport"`);
-    expect((await service().summary(ADMIN)).totalLabour).toEqual({ total: reports.rows[0].total });
+    // The daily total labour card adds up the workers count of the labour daily reports of the service's today and
+    // yesterday (UTC), not the labour rows.
+    const reports = await q(
+      `SELECT
+         COALESCE(sum("workersCount") FILTER (WHERE "reportDate" = $1::date), 0)::int AS "today",
+         COALESCE(sum("workersCount") FILTER (WHERE "reportDate" = $2::date), 0)::int AS "yesterday"
+       FROM "DailyReport"`,
+      [day(0), day(-1)],
+    );
+    expect((await service().summary(ADMIN)).totalLabour).toEqual(reports.rows[0]);
   });
 
   // NOW is 18:37 on 2026-10-12 in Kuwait (UTC+3), and the alert window is 8 hours: a pending work ending that day is due soon (its

@@ -94,6 +94,8 @@ export type VillaPhaseRow = {
   progressRatio: number;
   progress: number;
   version: number;
+  // The latest progress change of its open works on the villa: when and by whom (null: none, or the user is gone).
+  lastChange: { at: Date; by: { id: string; name: string } | null } | null;
 };
 
 export type VillaListRow = Prisma.VillaGetPayload<{ select: typeof listSelect }> & ProgressTotals;
@@ -276,6 +278,22 @@ function joinsOf({ field }: VillaSort): Prisma.Sql {
 const totalsOf = (totals: Map<string, ProgressTotals>, id: string): ProgressTotals =>
   totals.get(id) ?? { doneRatio: 0, phaseCount: 0 };
 
+// The newest progress change among some open works: when and by whom.
+function lastChangeOf(
+  works: readonly {
+    progressUpdatedAt: Date | null;
+    progressUpdatedBy: { id: string; name: string } | null;
+  }[],
+): VillaPhaseRow["lastChange"] {
+  let latest: VillaPhaseRow["lastChange"] = null;
+  for (const work of works) {
+    if (work.progressUpdatedAt && (!latest || work.progressUpdatedAt > latest.at)) {
+      latest = { at: work.progressUpdatedAt, by: work.progressUpdatedBy };
+    }
+  }
+  return latest;
+}
+
 // The same totals, from phases already loaded (the detail).
 function totalsOfPhases(phases: readonly VillaPhaseRow[]): ProgressTotals {
   return {
@@ -424,7 +442,12 @@ export class VillasRepository {
     // A phase's progress is read from the villa's open works filed under it (phaseProgressOf, the twin of PHASE_PROGRESS).
     const openWorks = await db.workItem.findMany({
       where: { villaId: id },
-      select: { elecPhaseId: true, progress: true },
+      select: {
+        elecPhaseId: true,
+        progress: true,
+        progressUpdatedAt: true,
+        progressUpdatedBy: { select: { id: true, name: true } },
+      },
     });
     const phases = active.map((phase): VillaPhaseRow => ({
       elecPhaseId: phase.id,
@@ -436,6 +459,7 @@ export class VillasRepository {
       ),
       // The version of the phase's progress row (the PATCH endpoint's If-Match); 1 when the row is missing.
       version: phase.villaProgress[0]?.version ?? 1,
+      lastChange: lastChangeOf(openWorks.filter((work) => work.elecPhaseId === phase.id)),
     }));
     return {
       ...row,

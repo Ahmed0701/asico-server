@@ -808,7 +808,7 @@ The centre of the system: everything else (open works, reports, labour, progress
 | `contractor`          | `(Party & { phone: string }) \| null` | `{ id, name, phone }`, or null.                                                                                                                                                                     |
 | `createdBy`           | `{ id: string; name: string }`        | `{ id, name }`.                                                                                                                                                                                     |
 | `phaseCount`          | `number`                              | How many active phases the progress is averaged over.                                                                                                                                               |
-| `phases`              | `PhaseProgressDto[]`                  | The active phases, in display order, each with the villa's progress in it.                                                                                                                          |
+| `phases`              | `VillaPhaseDto[]`                     | The active phases, in display order, each with the villa's progress in it and its latest change.                                                                                                    |
 
 #### `VillaMarkDto`
 
@@ -951,7 +951,7 @@ In this example `1250500` is 1,250.500 KWD: the dinar has three decimals, so `bu
 
 <!-- modules: villas -->
 
-**Errors:** `AREA_NOT_FOUND`, `CIVIL_ENGINEER_INACTIVE`, `CIVIL_ENGINEER_NOT_FOUND`, `CONTRACTOR_INACTIVE`, `CONTRACTOR_NOT_FOUND`, `ELECTRICAL_ENGINEER_INACTIVE`, `ELECTRICAL_ENGINEER_NOT_FOUND`, `IMPORT_DATA_CHANGED`, `NO_FILE_PROVIDED`, `VILLA_ALREADY_MEW_FOLLOW_UP`, `VILLA_ALREADY_MEW_INSPECTION`, `VILLA_ALREADY_MEW_INSPECTION_PASSED`, `VILLA_HAS_RECORDS`, `VILLA_MEW_NOT_APPROVED`, `VILLA_NOT_FOUND`, `VILLA_NOT_MEW_FOLLOW_UP`, `VILLA_NOT_MEW_INSPECTION`, `VILLA_NOT_MEW_INSPECTION_PASSED`, `VILLA_NUMBER_TAKEN`, `VILLA_PLOT_TAKEN`
+**Errors:** `AREA_NOT_FOUND`, `CIVIL_ENGINEER_INACTIVE`, `CIVIL_ENGINEER_NOT_FOUND`, `CONTRACTOR_INACTIVE`, `CONTRACTOR_NOT_FOUND`, `ELECTRICAL_ENGINEER_INACTIVE`, `ELECTRICAL_ENGINEER_NOT_FOUND`, `IMPORT_DATA_CHANGED`, `NO_FILE_PROVIDED`, `VILLA_ALREADY_MEW_FOLLOW_UP`, `VILLA_ALREADY_MEW_INSPECTION`, `VILLA_ALREADY_MEW_INSPECTION_PASSED`, `VILLA_HAS_RECORDS`, `VILLA_MEW_NOT_APPROVED`, `VILLA_NOT_FOUND`, `VILLA_NOT_MEW_FOLLOW_UP`, `VILLA_NOT_MEW_INSPECTION`, `VILLA_NOT_MEW_INSPECTION_PASSED`, `VILLA_NUMBER_TAKEN`, `VILLA_PLOT_TAKEN`, `VILLA_VARIATION_ORDERS_PENDING`
 
 ### Phase progress
 
@@ -971,6 +971,25 @@ How far a villa has got in one electrical phase. `PATCH /villas/:villaId/phases/
 | `progress`    | `number`        | 0 to 100.                                                            |
 | `state`       | `ProgressState` | `NOT_STARTED` at 0, `DONE` at 100, `IN_PROGRESS` between.            |
 | `version`     | `number`        | The version of the progress row: what the update's If-Match carries. |
+
+#### `VillaPhaseDto`
+
+| Field         | Type                         | Notes                                                                                                                                                                                                         |
+| ------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `elecPhaseId` | `string`                     | The electrical phase.                                                                                                                                                                                         |
+| `name`        | `string`                     | The phase's name.                                                                                                                                                                                             |
+| `order`       | `number`                     | The phase's place in the list (its sortOrder).                                                                                                                                                                |
+| `progress`    | `number`                     | 0 to 100, from the villa's open works under the phase.                                                                                                                                                        |
+| `state`       | `ProgressState`              | `NOT_STARTED` at 0, `DONE` at 100, `IN_PROGRESS` between.                                                                                                                                                     |
+| `version`     | `number`                     | The version of the progress row: what the update's If-Match carries.                                                                                                                                          |
+| `lastChange`  | `PhaseLastChangeDto \| null` | The latest progress change of the villa's open works under the phase (set on create, import, and an edit that changes the progress or moves the work to another phase). Null when the phase has no open work. |
+
+#### `PhaseLastChangeDto`
+
+| Field | Type                   | Notes                                          |
+| ----- | ---------------------- | ---------------------------------------------- |
+| `at`  | `string`               | ISO 8601 instant of the change.                |
+| `by`  | `{ id, name } \| null` | Who made it, or null if that user was deleted. |
 
 #### `PhaseProgressUpdateDto`
 
@@ -1327,7 +1346,7 @@ The villa cannot be changed after the work is made (`villaId` in a `PATCH` is re
 
 ## Notifications
 
-What the server raises for the signed-in user. There are three kinds: two about a small work, `SMALL_WORK_DUE_SOON` (a pending work entered its last hours before the deadline) and `SMALL_WORK_OVERDUE` (a pending work passed its deadline), and one about an open work, `OPEN_WORK_OVERDUE` (an open work that is not done passed its end date, in `APP_TIMEZONE`). An open work's notification goes to every active administrator and every active user holding `open-works:read`, once per end date, and is never emailed.
+What the server raises for the signed-in user. There are six kinds: two about a small work, `SMALL_WORK_DUE_SOON` (a pending work entered its last hours before the deadline) and `SMALL_WORK_OVERDUE` (a pending work passed its deadline), one about an open work, `OPEN_WORK_OVERDUE` (an open work that is not done passed its end date, in `APP_TIMEZONE`), and `OWNER_NOTE_REMINDER`: once a day (in `APP_TIMEZONE`) for every owner note not checked as done, to every active administrator and every active user with `owner-notes:read`. `FOREMAN_MISSION_REMINDER` is the same for every foreman mission not checked as done, to the users with `foreman-missions:read`. `PAYMENT_OVERDUE` comes once a day for every pending payment to a contractor past its due date, to the users with `payments:read`, until it is marked paid. Owner note, foreman mission and payment reminders are in the app only, never emailed. An open work's notification goes to every active administrator and every active user holding `open-works:read`, once per end date, and is never emailed.
 
 - **Own notifications only.** Every call is scoped to the caller; there is no way to read or mark someone else's. A notification that is not yours is `404 NOTIFICATION_NOT_FOUND`, the same as one that does not exist. No permission code is needed beyond being signed in.
 - **Who gets them:** every active administrator and every active user holding `small-works:read`, at the moment the hourly job (and once at startup) finds the work in that situation. One notification per work, per situation and per end date: a work that stays due soon does not raise it again at every run. Giving the work a later end date, or moving it from `DONE` back to `PENDING`, is a new situation and can raise it again. A work that is marked `DONE` raises nothing.
@@ -1339,23 +1358,23 @@ What the server raises for the signed-in user. There are three kinds: two about 
 
 #### `NotificationDto`
 
-| Field       | Type                                                                                    | Notes                                                                                                                                                                                  |
-| ----------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`        | `string`                                                                                | uuid                                                                                                                                                                                   |
-| `kind`      | `NotificationKindValue`                                                                 | `SMALL_WORK_DUE_SOON`, `SMALL_WORK_OVERDUE` or `OPEN_WORK_OVERDUE`.                                                                                                                    |
-| `title`     | `{ en: string; ar: string }`                                                            | The headline, in both languages.                                                                                                                                                       |
-| `body`      | `{ en: string; ar: string }`                                                            | The sentence, in both languages.                                                                                                                                                       |
-| `entity`    | `{ type: "SMALL_WORK" \| "OPEN_WORK"; id: string; villaId: string }`                    | What to open. `id` is the small work's or the open work's id.                                                                                                                          |
-| `data`      | `{ villaNumber: string; description: string; contractorName: string; endDate: string }` | The facts of the alert as they were when it was raised. `endDate` is YYYY-MM-DD. For an open work, `description` is its electrical phase and `contractorName` is `-` when it has none. |
-| `read`      | `boolean`                                                                               | Whether the caller has read it.                                                                                                                                                        |
-| `readAt`    | `string \| null`                                                                        | ISO 8601 instant, UTC, or null while unread.                                                                                                                                           |
-| `createdAt` | `string`                                                                                | ISO 8601 instant, UTC: when the alert was raised.                                                                                                                                      |
+| Field       | Type                                                                                                                   | Notes                                                                                                                                                                                                                                                                                                                                           |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`        | `string`                                                                                                               | uuid                                                                                                                                                                                                                                                                                                                                            |
+| `kind`      | `NotificationKindValue`                                                                                                | `SMALL_WORK_DUE_SOON`, `SMALL_WORK_OVERDUE`, `OPEN_WORK_OVERDUE`, `OWNER_NOTE_REMINDER`, `FOREMAN_MISSION_REMINDER` or `PAYMENT_OVERDUE`.                                                                                                                                                                                                       |
+| `title`     | `{ en: string; ar: string }`                                                                                           | The headline, in both languages.                                                                                                                                                                                                                                                                                                                |
+| `body`      | `{ en: string; ar: string }`                                                                                           | The sentence, in both languages.                                                                                                                                                                                                                                                                                                                |
+| `entity`    | `{ type: "SMALL_WORK" \| "OPEN_WORK" \| "OWNER_NOTE" \| "FOREMAN_MISSION" \| "PAYMENT"; id: string; villaId: string }` | What to open. `id` is the small work's, the open work's, the owner note's, the foreman mission's or the payment's id (`villaId` is empty for a payment with no villa).                                                                                                                                                                          |
+| `data`      | `{ villaNumber: string; description: string; contractorName: string; endDate: string }`                                | The facts of the alert as they were when it was raised. `endDate` is YYYY-MM-DD. For an open work, `description` is its electrical phase and `contractorName` is `-` when it has none. For an owner note or a foreman mission, `description` is the start of its text, `contractorName` the owner's name and `endDate` the day of the reminder. |
+| `read`      | `boolean`                                                                                                              | Whether the caller has read it.                                                                                                                                                                                                                                                                                                                 |
+| `readAt`    | `string \| null`                                                                                                       | ISO 8601 instant, UTC, or null while unread.                                                                                                                                                                                                                                                                                                    |
+| `createdAt` | `string`                                                                                                               | ISO 8601 instant, UTC: when the alert was raised.                                                                                                                                                                                                                                                                                               |
 
 **Kinds**
 
 <!-- list: NOTIFICATION_KINDS -->
 
-`SMALL_WORK_DUE_SOON`, `SMALL_WORK_OVERDUE`, `OPEN_WORK_OVERDUE`
+`SMALL_WORK_DUE_SOON`, `SMALL_WORK_OVERDUE`, `OPEN_WORK_OVERDUE`, `OWNER_NOTE_REMINDER`, `FOREMAN_MISSION_REMINDER`, `PAYMENT_OVERDUE`
 
 **List** `GET /notifications`
 
@@ -1540,9 +1559,12 @@ How many workers a contractor had on a villa on a day.
 - `progress` counts villas **derived from the phase progress**: not started (0 in every active phase), done (100 in every one of them, and there is at least one), in progress otherwise. The three add up to `villas.total`; `average` is the mean overall progress, one decimal.
 - `overdue` and `upcoming` look at the villas' **target date**: overdue is before today, upcoming is from today to 30 days ahead (a villa due today is upcoming). `mewFollowUp.count` is the villas on the MEW follow-up list, put there by a person, never derived from the progress. `mewInspection.count` is the villas on the MEW inspection list that have not passed it yet.
 - `maintenance` (`maintenance:read`) counts the maintenance villas still `open` and the ones checked as `solved`.
+- `ownerNotes` (`owner-notes:read`) counts the owner notes still `open` (reminded daily) and the ones checked as `done`.
+- `foremanMissions` (`foreman-missions:read`) counts the foreman missions still `open` (reminded daily) and the ones checked as `done`.
+- `payments` (`payments:read`) adds up the payments to contractors in KWD fils: still `pending` (`pendingCount` of them), `overdue` (pending past their due date, `APP_TIMEZONE`), and paid this month by paid date.
 - `byArea` lists up to 50 areas, `topContractors` the 10 contractors with the most villas.
 - The daily figures (`dailyReports`, `labour`) are `today` and `last7Days` (today and the six days before it). `dailyReports` counts every contractor's reports (a report belongs to a contractor, not to a villa); `labour` adds up the workers. "Today" is the **UTC day** ([below](#the-utc-day)).
-- `openWorks.total`, `smallWorks.total`, `smallWorks.pending`, `totalLabour.total` and `siteReports` are over all time. `smallWorks.dueSoon`, `smallWorks.overdue`, `delayedSmallWorks.dueSoon` and `delayedSmallWorks.overdue` count the pending works by the deadline rules of [Daily small works](#daily-small-works) (so they follow the application time zone and `SMALL_WORKS_ALERT_HOURS_BEFORE`, not the UTC day), and `smallWorks.urgent` lists up to 5 of those, earliest end date first (so the overdue ones come before the due soon ones), then the oldest. `delayedSmallWorks` is the same overdue and due soon counts as `smallWorks`, for a dedicated dashboard card.
+- `openWorks.total`, `smallWorks.total`, `smallWorks.pending` and `siteReports` are over all time; `totalLabour` is per UTC day (today and yesterday). `smallWorks.dueSoon`, `smallWorks.overdue`, `delayedSmallWorks.dueSoon` and `delayedSmallWorks.overdue` count the pending works by the deadline rules of [Daily small works](#daily-small-works) (so they follow the application time zone and `SMALL_WORKS_ALERT_HOURS_BEFORE`, not the UTC day), and `smallWorks.urgent` lists up to 5 of those, earliest end date first (so the overdue ones come before the due soon ones), then the oldest. `delayedSmallWorks` is the same overdue and due soon counts as `smallWorks`, for a dedicated dashboard card.
 
 #### `DashboardSummaryDto`
 
@@ -1561,8 +1583,11 @@ How many workers a contractor had on a villa on a day.
 | `smallWorks`        | `{ total: number; pending: number; dueSoon: number; overdue: number; urgent: UrgentSmallWorkDto[] } \| null`                                                                             | Daily small works (small-works:read): all of them (`total`, whatever the status); the ones still pending, over all time; how many of those are due soon and overdue (the rules of Daily small works, in the application time zone); and up to 5 of the most urgent of the latter two, earliest end date first.                                                                           |
 | `siteReports`       | `{ count: number; averageRating: number \| null } \| null`                                                                                                                               | Site reports (site-reports:read): over all time. The average has one decimal and is null when there is no report.                                                                                                                                                                                                                                                                        |
 | `labour`            | `DailyFiguresDto \| null`                                                                                                                                                                | Daily labour (daily-labour:read): the number of labourers, added up over the rows of today and of the last 7 days.                                                                                                                                                                                                                                                                       |
-| `totalLabour`       | `{ total: number } \| null`                                                                                                                                                              | Total labour (daily-reports:read): the `workersCount` of every labour daily report added up, all time (not the number of reports).                                                                                                                                                                                                                                                       |
+| `totalLabour`       | `{ today: number; yesterday: number } \| null`                                                                                                                                           | Workers on the labour daily reports of today, and of yesterday (UTC days).                                                                                                                                                                                                                                                                                                               | Total labour (daily-reports:read): the `workersCount` of every labour daily report added up, all time (not the number of reports). |
 | `maintenance`       | `{ open: number; solved: number } \| null`                                                                                                                                               | Maintenance villas (maintenance:read): the ones still open, and the ones checked as solved.                                                                                                                                                                                                                                                                                              |
+| `ownerNotes`        | `{ open: number; done: number } \| null`                                                                                                                                                 | Owner notes still open, and checked as done.                                                                                                                                                                                                                                                                                                                                             |
+| `foremanMissions`   | `{ open: number; done: number } \| null`                                                                                                                                                 | Foreman missions still open, and checked as done.                                                                                                                                                                                                                                                                                                                                        |
+| `payments`          | `{ pendingCount: number; pendingMinor: number; overdueCount: number; overdueMinor: number; paidThisMonthMinor: number } \| null`                                                         | Payments to contractors, KWD fils (1 KWD = 1000).                                                                                                                                                                                                                                                                                                                                        |
 | `delayedSmallWorks` | `DelayedSmallWorksDto \| null`                                                                                                                                                           | Delayed small works (small-works:read): pending works that are overdue or due soon (same rules as notifications). Not the open-works `DELAYED` status.                                                                                                                                                                                                                                   |
 | `generatedAt`       | `string`                                                                                                                                                                                 | ISO 8601 instant when the summary was worked out.                                                                                                                                                                                                                                                                                                                                        |
 
@@ -1674,9 +1699,18 @@ An administrator's answer:
   },
   "siteReports": { "count": 64, "averageRating": 4.2 },
   "labour": { "today": 412, "last7Days": 2810 },
-  "totalLabour": { "total": 128450 },
+  "totalLabour": { "today": 412, "yesterday": 388 },
   "delayedSmallWorks": { "overdue": 1, "dueSoon": 2 },
   "maintenance": { "open": 4, "solved": 9 },
+  "ownerNotes": { "open": 3, "done": 12 },
+  "foremanMissions": { "open": 3, "done": 12 },
+  "payments": {
+    "pendingCount": 4,
+    "pendingMinor": 5250500,
+    "overdueCount": 1,
+    "overdueMinor": 1250000,
+    "paidThisMonthMinor": 9800000
+  },
   "generatedAt": "2026-03-01T09:30:00.000Z"
 }
 ```
@@ -1702,9 +1736,12 @@ An employee who holds only `dashboard:read`, `villas:read` and `daily-reports:re
   "smallWorks": null,
   "siteReports": null,
   "labour": null,
-  "totalLabour": { "total": 5240 },
+  "totalLabour": { "today": 96, "yesterday": 120 },
   "delayedSmallWorks": null,
   "maintenance": null,
+  "ownerNotes": null,
+  "foremanMissions": null,
+  "payments": null,
   "generatedAt": "2026-03-01T09:30:00.000Z"
 }
 ```

@@ -17,10 +17,35 @@ const TEXT_KEYS: Record<NotificationKindValue, { title: MessageKey; body: Messag
     title: "notifications.openWorkOverdue.title",
     body: "notifications.openWorkOverdue.body",
   },
+  OWNER_NOTE_REMINDER: {
+    title: "notifications.ownerNoteReminder.title",
+    body: "notifications.ownerNoteReminder.body",
+  },
+  FOREMAN_MISSION_REMINDER: {
+    title: "notifications.foremanMissionReminder.title",
+    body: "notifications.foremanMissionReminder.body",
+  },
+  PAYMENT_OVERDUE: {
+    title: "notifications.paymentOverdue.title",
+    body: "notifications.paymentOverdue.body",
+  },
 };
 
-// The thing the notification is about: the database keeps exactly one of the two set.
+// The thing the notification is about: the database keeps exactly one of them set.
 function entityOf(notification: RecipientRow["notification"]): NotificationDto["entity"] {
+  if (notification.ownerNote) {
+    return { type: "OWNER_NOTE", id: notification.ownerNote.id, villaId: notification.ownerNote.villaId };
+  }
+  if (notification.payment) {
+    return { type: "PAYMENT", id: notification.payment.id, villaId: notification.payment.villaId ?? "" };
+  }
+  if (notification.foremanMission) {
+    return {
+      type: "FOREMAN_MISSION",
+      id: notification.foremanMission.id,
+      villaId: notification.foremanMission.villaId,
+    };
+  }
   if (notification.workItem) {
     return { type: "OPEN_WORK", id: notification.workItem.id, villaId: notification.workItem.villaId };
   }

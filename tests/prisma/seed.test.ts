@@ -25,7 +25,7 @@ describe("seedPermissions", () => {
   it("upserts every permission code without touching existing rows", async () => {
     await expect(seedPermissions(db)).resolves.toBe(PERMISSION_CODES.length);
 
-    expect(upsert).toHaveBeenCalledTimes(80);
+    expect(upsert).toHaveBeenCalledTimes(92);
     for (const code of PERMISSION_CODES) {
       expect(upsert).toHaveBeenCalledWith({ where: { code }, update: {}, create: { code } });
     }

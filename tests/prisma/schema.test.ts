@@ -10,19 +10,22 @@ const schema = readFileSync(new URL("../../prisma/schema.prisma", import.meta.ur
 );
 
 describe("generated Prisma client", () => {
-  it("exposes exactly the 30 approved models", () => {
+  it("exposes exactly the 36 approved models", () => {
     expect(Object.values(Prisma.ModelName).sort()).toEqual(
       [
         "Area",
         "AuditLog",
         "CivilEngineer",
         "Contractor",
+        "ContractorPayment",
+        "ContractorPaymentFile",
         "DailyLabour",
         "DailyReport",
         "DailySmallWork",
         "ElecPhase",
         "ElectricalEngineer",
         "Factory",
+        "ForemanMission",
         "IdempotencyKey",
         "ImportBatch",
         "MaintenanceVilla",
@@ -32,6 +35,7 @@ describe("generated Prisma client", () => {
         "MaterialItem",
         "Notification",
         "NotificationRecipient",
+        "OwnerNote",
         "PasswordResetToken",
         "Permission",
         "SiteReport",
@@ -43,6 +47,8 @@ describe("generated Prisma client", () => {
         "RefreshToken",
         "User",
         "UserPermission",
+        "VariationOrder",
+        "VariationOrderFile",
       ].sort(),
     );
   });

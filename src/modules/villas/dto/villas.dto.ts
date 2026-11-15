@@ -104,8 +104,15 @@ export type VillaDetailDto = Omit<VillaListItemDto, "civilEngineer" | "electrica
   // How many active phases the progress is averaged over.
   phaseCount: number;
   // The active phases, in display order, each with the villa's progress in it.
-  phases: PhaseProgressDto[];
+  phases: VillaPhaseDto[];
 };
+
+// The latest progress change of the open works of a villa under one phase: when (ISO 8601) and by whom (null: the user is
+// gone).
+export type PhaseLastChangeDto = { at: string; by: { id: string; name: string } | null };
+
+// One active phase of a villa in its detail: the phase's progress, and its latest change (null: the phase has no open work).
+export type VillaPhaseDto = PhaseProgressDto & { lastChange: PhaseLastChangeDto | null };
 
 export type VillaOptionDto = { id: string; villaNumber: string };
 // Values for the list's filter dropdowns. The engineers are those with at least one villa, active or not.

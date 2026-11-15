@@ -259,6 +259,14 @@ export class OpenWorksService {
         this.checkDateOrder(input, current, ctx);
 
         const patch = patchOf(input);
+        // A new progress, or the work moved to another phase, changes what the villa page shows for the phase: who and when.
+        if (
+          (patch.progress !== undefined && patch.progress !== current.progress) ||
+          (patch.elecPhaseId !== undefined && patch.elecPhaseId !== current.elecPhaseId)
+        ) {
+          patch.progressUpdatedAt = new Date();
+          patch.progressUpdatedById = actor.id;
+        }
         const row = await this.repository.update(id, current.version, patch, tx);
         if (!row) {
           throw versionConflict(ctx.locale, (await this.repository.lockVersion(id, tx)) ?? current.version);

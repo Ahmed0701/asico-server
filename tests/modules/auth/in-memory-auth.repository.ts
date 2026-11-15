@@ -3,6 +3,8 @@ import { Serial } from "../../helpers/serial.js";
 import { dailyReportTables } from "../daily-reports/daily-report-tables.js";
 import { dailyLabourTables } from "../daily-labour/daily-labour-tables.js";
 import { materialTables } from "../materials/material-tables.js";
+import { ownerNoteTables } from "../owner-notes/owner-notes-tables.js";
+import { foremanMissionTables } from "../foreman-missions/foreman-missions-tables.js";
 import { siteReportTables } from "../site-reports/site-report-tables.js";
 import { smallWorkTables } from "../small-works/small-work-tables.js";
 import { workItemTables } from "../open-works/work-item-tables.js";
@@ -50,6 +52,7 @@ export const store = {
   failAuditWith: null as Error | null,
 
   reset(): void {
+    pendingVariationOrders.clear();
     this.users = [];
     this.refreshTokens = [];
     this.resetTokens = [];
@@ -155,6 +158,25 @@ const fakeTx = {
   materialDelivery: {
     count: async ({ where }: { where: Parameters<typeof materialTables.count>[0] }): Promise<number> =>
       materialTables.count(where),
+  },
+  // What the villas count of the payments (payments/repository/payment-rows.ts): none in these fakes.
+  contractorPayment: {
+    count: async (): Promise<number> => 0,
+  },
+  // What the villas count of the variation orders (variation-orders/repository/variation-order-rows.ts): none in these fakes.
+  variationOrder: {
+    count: async ({ where }: { where: { villaId: string; status?: string } }): Promise<number> =>
+      where.status === "PENDING" ? (pendingVariationOrders.get(where.villaId) ?? 0) : 0,
+  },
+  // What the villas count of the owner notes (owner-notes/repository/owner-note-rows.ts).
+  ownerNote: {
+    count: async ({ where }: { where: { villaId: string } }): Promise<number> =>
+      ownerNoteTables.rows.filter((row) => row.villaId === where.villaId).length,
+  },
+  // What the villas count of the foreman missions (foreman-missions/repository/foreman-mission-rows.ts).
+  foremanMission: {
+    count: async ({ where }: { where: { villaId: string } }): Promise<number> =>
+      foremanMissionTables.rows.filter((row) => row.villaId === where.villaId).length,
   },
 } as unknown as Db;
 
@@ -319,6 +341,9 @@ export class InMemoryAuthRepository implements AuthRepository {
 }
 
 // What the core middleware (auth, requirePermission) and the health module read through the global client.
+// Pending variation orders per villa id (what the MEW inspection check counts). Cleared by `store.reset()`.
+export const pendingVariationOrders = new Map<string, number>();
+
 export const fakePrisma = {
   user: {
     findUnique: async ({ where }: { where: { id: string } }) => {

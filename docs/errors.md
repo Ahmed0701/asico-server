@@ -124,6 +124,7 @@ See [write-safety.md](write-safety.md).
 | `VILLA_NOT_MEW_FOLLOW_UP`             | 409    | Taking a villa off MEW follow up that is not on it.                                                                                 |
 | `VILLA_ALREADY_MEW_INSPECTION`        | 409    | Putting a villa on MEW inspection that is already on it.                                                                            |
 | `VILLA_MEW_NOT_APPROVED`              | 409    | Putting a villa on MEW inspection while its MEW AC state or MEW electricity state is not `APPROVED`.                                |
+| `VILLA_VARIATION_ORDERS_PENDING`      | 409    | Putting a villa on MEW inspection while one of its variation orders is still `PENDING`. `details[0].value` is how many.             |
 | `VILLA_NOT_MEW_INSPECTION`            | 409    | Taking a villa off MEW inspection that is not on it.                                                                                |
 | `VILLA_ALREADY_MEW_INSPECTION_PASSED` | 409    | Checking a villa as passed MEW inspection when it already is.                                                                       |
 | `VILLA_NOT_MEW_INSPECTION_PASSED`     | 409    | Taking back a passed MEW inspection that the villa does not have.                                                                   |
@@ -150,6 +151,15 @@ See [write-safety.md](write-safety.md).
 | `DELIVERY_NOTE_LIMIT`                 | 409    | Adding delivery note files beyond the 10 a delivery can have.                                                                       |
 | `DELIVERY_NOTE_NOT_FOUND`             | 404    | Opening or removing the delivery note of a delivery that has none.                                                                  |
 | `MAINTENANCE_NOT_FOUND`               | 404    | No such maintenance villa.                                                                                                          |
+| `OWNER_NOTE_NOT_FOUND`                | 404    | No such owner note.                                                                                                                 |
+| `FOREMAN_MISSION_NOT_FOUND`           | 404    | No such foreman mission.                                                                                                            |
+| `PAYMENT_NOT_FOUND`                   | 404    | No such payment.                                                                                                                    |
+| `PAYMENT_FILE_NOT_FOUND`              | 404    | No such file on this payment.                                                                                                       |
+| `PAYMENT_FILE_LIMIT`                  | 409    | The payment would hold more than 10 files.                                                                                          |
+| `VARIATION_ORDER_NOT_FOUND`           | 404    | No such variation order.                                                                                                            |
+| `VARIATION_ORDER_NUMBER_TAKEN`        | 409    | The villa already has a variation order with this VO number (case-insensitive).                                                     |
+| `VARIATION_ORDER_FILE_NOT_FOUND`      | 404    | No such file on this variation order.                                                                                               |
+| `VARIATION_ORDER_FILE_LIMIT`          | 409    | The variation order would hold more than 10 files.                                                                                  |
 
 ### Documents
 

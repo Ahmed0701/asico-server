@@ -206,6 +206,7 @@ export class ContractorsRepository {
             dailyReports: true,
             dailySmallWorks: true,
             dailyLabours: true,
+            payments: true,
           },
         },
       },

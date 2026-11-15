@@ -30,6 +30,9 @@ export const CARD_PERMISSIONS = {
   labour: [PERMISSIONS.DAILY_LABOUR_READ],
   totalLabour: [PERMISSIONS.DAILY_REPORTS_READ],
   maintenance: [PERMISSIONS.MAINTENANCE_READ],
+  ownerNotes: [PERMISSIONS.OWNER_NOTES_READ],
+  foremanMissions: [PERMISSIONS.FOREMAN_MISSIONS_READ],
+  payments: [PERMISSIONS.PAYMENTS_READ],
 } as const satisfies Record<string, readonly Permission[]>;
 
 export type DashboardCard = keyof typeof CARD_PERMISSIONS;
@@ -111,13 +114,27 @@ export type DashboardSummaryDto = {
   siteReports: { count: number; averageRating: number | null } | null;
   // Daily labour (daily-labour:read): the number of labourers, added up over the rows of today and of the last 7 days.
   labour: DailyFiguresDto | null;
-  // Total labour (daily-reports:read): the workers count added up over every labour daily report, all time.
-  totalLabour: { total: number } | null;
+  // Daily total labour (daily-reports:read): the workers count added up over the labour daily reports of today,
+  // and of yesterday (UTC days).
+  totalLabour: { today: number; yesterday: number } | null;
   // Delayed small works (small-works:read): pending works that are overdue or due soon (APP_TIMEZONE and
   // SMALL_WORKS_ALERT_HOURS_BEFORE, same as notifications). Not the open-works DELAYED status.
   delayedSmallWorks: DelayedSmallWorksDto | null;
   // Maintenance villas (maintenance:read): the ones still open, and the ones checked as solved.
   maintenance: { open: number; solved: number } | null;
+  // Owner notes (owner-notes:read): the open ones (reminded daily), and the ones checked as done.
+  // Foreman missions (foreman-missions:read): the open ones (reminded daily), and the ones checked as done.
+  ownerNotes: { open: number; done: number } | null;
+  foremanMissions: { open: number; done: number } | null;
+  // Payments to contractors (payments:read), KWD fils: still to pay (and how many), overdue (pending past their due date,
+  // APP_TIMEZONE), and paid this month (by paid date).
+  payments: {
+    pendingCount: number;
+    pendingMinor: number;
+    overdueCount: number;
+    overdueMinor: number;
+    paidThisMonthMinor: number;
+  } | null;
   generatedAt: string;
 };
 

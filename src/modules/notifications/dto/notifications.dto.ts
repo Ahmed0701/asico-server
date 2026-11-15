@@ -1,17 +1,25 @@
 import type { PageMeta } from "../../../shared/query/pagination.js";
 
-// What a notification is about. One kind per situation of a small work or an open work (see the Notification model).
-export const NOTIFICATION_KINDS = ["SMALL_WORK_DUE_SOON", "SMALL_WORK_OVERDUE", "OPEN_WORK_OVERDUE"] as const;
+// What a notification is about. One kind per situation of a small work or an open work, and the daily reminder of an open
+// owner note or foreman mission (see the Notification model).
+export const NOTIFICATION_KINDS = [
+  "SMALL_WORK_DUE_SOON",
+  "SMALL_WORK_OVERDUE",
+  "OPEN_WORK_OVERDUE",
+  "OWNER_NOTE_REMINDER",
+  "FOREMAN_MISSION_REMINDER",
+  "PAYMENT_OVERDUE",
+] as const;
 export type NotificationKindValue = (typeof NOTIFICATION_KINDS)[number];
 
 // The text of the alert as it was when it was raised, kept in the row so that history does not change when the work is edited.
 export type NotificationData = {
   villaNumber: string;
-  // The small work's description, or the open work's electrical phase.
+  // The small work's description, the open work's electrical phase, or the owner note's text.
   description: string;
-  // "-" for an open work with no contractor.
+  // "-" for an open work with no contractor. For an owner note: the owner's name.
   contractorName: string;
-  // YYYY-MM-DD
+  // YYYY-MM-DD. For an owner note: the day of the reminder.
   endDate: string;
 };
 
@@ -24,7 +32,11 @@ export type NotificationDto = {
   title: LocalizedText;
   body: LocalizedText;
   // What to open when the notification is clicked.
-  entity: { type: "SMALL_WORK" | "OPEN_WORK"; id: string; villaId: string };
+  entity: {
+    type: "SMALL_WORK" | "OPEN_WORK" | "OWNER_NOTE" | "FOREMAN_MISSION" | "PAYMENT";
+    id: string;
+    villaId: string;
+  };
   data: NotificationData;
   read: boolean;
   readAt: string | null;

@@ -14,6 +14,13 @@ import {
 } from "../../../shared/utils/index.js";
 import { countLabourOfVilla } from "../../daily-labour/repository/daily-labour-rows.js";
 import { countDeliveriesOfVilla } from "../../materials/repository/material-delivery-rows.js";
+import { countForemanMissionsOfVilla } from "../../foreman-missions/repository/foreman-mission-rows.js";
+import { countOwnerNotesOfVilla } from "../../owner-notes/repository/owner-note-rows.js";
+import { countPaymentsOfVilla } from "../../payments/repository/payment-rows.js";
+import {
+  countPendingVariationOrdersOfVilla,
+  countVariationOrdersOfVilla,
+} from "../../variation-orders/repository/variation-order-rows.js";
 import { countManualItemsOfVilla } from "../../open-works/repository/work-item-rows.js";
 import { countSiteReportsOfVilla } from "../../site-reports/repository/site-report-rows.js";
 import { countSmallWorksOfVilla } from "../../small-works/repository/small-work-rows.js";
@@ -103,6 +110,11 @@ const alreadyMewInspection = (ctx: RequestContext): AppError =>
 // MEW inspects a villa only after both files are approved: the AC and the electricity MEW states must be APPROVED.
 const mewNotApproved = (ctx: RequestContext): AppError =>
   fail(ctx, 409, "errors.villaMewNotApproved", "VILLA_MEW_NOT_APPROVED");
+// The number of unpaid variation orders goes in the details, so the app can say how many.
+const variationOrdersPending = (ctx: RequestContext, count: number): AppError =>
+  new AppError(409, t(ctx.locale, "errors.villaVariationOrdersPending"), "VILLA_VARIATION_ORDERS_PENDING", [
+    { path: "variationOrders", message: t(ctx.locale, "errors.villaVariationOrdersPending"), value: count },
+  ]);
 const notMewInspection = (ctx: RequestContext): AppError =>
   fail(ctx, 409, "errors.villaNotMewInspection", "VILLA_NOT_MEW_INSPECTION");
 const alreadyMewInspectionPassed = (ctx: RequestContext): AppError =>
@@ -467,15 +479,16 @@ export class VillasService {
           if (states && (states.mewAcState !== "APPROVED" || states.mewElecState !== "APPROVED")) {
             throw mewNotApproved(ctx);
           }
+          // Every variation order of the villa must be paid first.
+          const pending = await countPendingVariationOrdersOfVilla(id, tx);
+          if (pending > 0) {
+            throw variationOrdersPending(ctx, pending);
+          }
         }
 
         const value = on ? { at: new Date(), byId: actor.id } : null;
         if (!(await this.repository.setMark(id, version, mark, value, tx))) {
           throw versionConflict(ctx.locale, (await this.repository.lockVersion(id, tx)) ?? version);
-        }
-        const row = await this.repository.findListRow(id, tx);
-        if (!row) {
-          throw notFound(ctx);
         }
         await audit.record(
           tx,
@@ -488,12 +501,65 @@ export class VillasService {
             after: toMarkSnapshot(mark, value),
           }),
         );
+        if (mark === "mewFollowUp" && !on) {
+          await this.resetMewStates(actor, id, version + 1, ctx, tx);
+        }
+        const row = await this.repository.findListRow(id, tx);
+        if (!row) {
+          throw notFound(ctx);
+        }
         return row;
       });
       return toListItemDto(updated);
     } catch (err) {
       return this.mapWriteError(err, ctx);
     }
+  }
+
+  // Taking a villa off the MEW follow-up list starts its MEW file over: both states back to NOT_SUBMITTED and no
+  // inspection day. Same transaction as the mark, audited as a MEW states change; nothing is written when already clear.
+  private async resetMewStates(
+    actor: Actor,
+    id: string,
+    version: number,
+    ctx: RequestContext,
+    tx: Db,
+  ): Promise<void> {
+    const stored = await this.repository.findMewStates(id, tx);
+    if (!stored) {
+      throw notFound(ctx);
+    }
+    const before = {
+      mewAcState: stored.mewAcState,
+      mewElecState: stored.mewElecState,
+      mewInspectionDate: stored.mewInspectionDate ? toDay(stored.mewInspectionDate) : null,
+    };
+    const after = {
+      mewAcState: "NOT_SUBMITTED",
+      mewElecState: "NOT_SUBMITTED",
+      mewInspectionDate: null,
+    } as const;
+    if (
+      before.mewAcState === after.mewAcState &&
+      before.mewElecState === after.mewElecState &&
+      before.mewInspectionDate === null
+    ) {
+      return;
+    }
+    if (!(await this.repository.setMewStates(id, version, after, tx))) {
+      throw versionConflict(ctx.locale, (await this.repository.lockVersion(id, tx)) ?? version);
+    }
+    await audit.record(
+      tx,
+      withMeta(ctx, {
+        actorId: actor.id,
+        action: "villa.mew_states",
+        entity: ENTITY,
+        entityId: id,
+        before,
+        after,
+      }),
+    );
   }
 
   // Sets the villa's MEW AC state, its MEW electricity state and its MEW inspection day: any of them.
@@ -572,7 +638,11 @@ export class VillasService {
           (await countSmallWorksOfVilla(id, tx)) > 0 ||
           (await countSiteReportsOfVilla(id, tx)) > 0 ||
           (await countLabourOfVilla(id, tx)) > 0 ||
-          (await countDeliveriesOfVilla(id, tx)) > 0
+          (await countDeliveriesOfVilla(id, tx)) > 0 ||
+          (await countOwnerNotesOfVilla(id, tx)) > 0 ||
+          (await countForemanMissionsOfVilla(id, tx)) > 0 ||
+          (await countPaymentsOfVilla(id, tx)) > 0 ||
+          (await countVariationOrdersOfVilla(id, tx)) > 0
         ) {
           throw hasRecords(ctx);
         }
