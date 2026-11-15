@@ -428,6 +428,8 @@ model ContractorPaymentFile {
 
 // A variation order of a villa (the Variation Orders card of the villa page): its number (unique in the villa), amount in
 // KWD fils, the day it was added, pending or paid, notes, and its PDF files. A villa with variation orders is not deleted.
+// Written in SQL, because Prisma cannot declare it: the unique index "VariationOrder_villaId_voNumber_ci_key" on
+// (villaId, lower(voNumber)), so the number is unique in the villa ignoring case even in a race.
 model VariationOrder {
   id          String               @id @default(uuid())
   villaId     String

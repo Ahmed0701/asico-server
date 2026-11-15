@@ -1046,6 +1046,43 @@ PDF files attached to a villa (a contract, a permit). `POST /villas/:villaId/doc
 
 **Errors:** `FILE_LINK_INVALID`, `FILE_NOT_FOUND`, `FILE_TOO_LARGE`, `INVALID_FILE_TYPE`, `NO_FILE_PROVIDED`, `TOO_MANY_FILES`, `VILLA_DOCUMENT_LIMIT`, `VILLA_NOT_FOUND`
 
+### Monthly progress
+
+`GET /monthly-progress` answers `{ data: MonthlyProgressItemDto[], meta, summary: MonthlyProgressSummaryDto }`. It needs `villas:read`.
+
+- `month` is YYYY-MM in APP_TIMEZONE, the current month when not sent; a later month is `MONTH_IN_FUTURE`. The month's figures are as at its end (as of now for the current month), the month before's as at the start of `month`.
+- The overall progress is never stored: a past figure is rebuilt from the audit log of the open works (each create, edit and delete records the work's villa, phase and progress), with the active phases and their progress ratios as they are now.
+- A villa added after the month is left out; one added during it has `previousProgress: null` (its change counts from 0).
+- `search` looks in the villa number, the location and the contractor's name. `sort` is `villaNumber` (default, natural order), `previous`, `current` or `change`, with `:asc` or `:desc`.
+
+#### `MonthlyProgressItemDto`
+
+| Field              | Type                            | Notes                                                                           |
+| ------------------ | ------------------------------- | ------------------------------------------------------------------------------- |
+| `villa`            | `{ id, villaNumber, location }` | The villa.                                                                      |
+| `contractor`       | `{ id, name } \| null`          | Its contractor now.                                                             |
+| `previousProgress` | `number \| null`                | 0 to 100 at the end of the month before; null when the villa did not exist yet. |
+| `currentProgress`  | `number`                        | 0 to 100 at the end of `month` (now for the current month).                     |
+| `change`           | `number`                        | `currentProgress` minus `previousProgress` (0 when null), one decimal.          |
+
+#### `MonthlyProgressSummaryDto`
+
+| Field             | Type      | Notes                                                              |
+| ----------------- | --------- | ------------------------------------------------------------------ |
+| `month`           | `string`  | YYYY-MM asked for.                                                 |
+| `previousMonth`   | `string`  | YYYY-MM before it.                                                 |
+| `isCurrentMonth`  | `boolean` | True when `month` is the current month: its figures are as of now. |
+| `villaCount`      | `number`  | Villas the filters match (all pages).                              |
+| `averagePrevious` | `number`  | Average `previousProgress` of those that existed, one decimal.     |
+| `averageCurrent`  | `number`  | Average `currentProgress`, one decimal.                            |
+| `averageChange`   | `number`  | Average `change`, one decimal.                                     |
+| `improvedCount`   | `number`  | Villas whose progress went up in the month.                        |
+| `unchangedCount`  | `number`  | Villas whose progress did not move.                                |
+
+<!-- modules: monthly-progress -->
+
+**Errors:** `MONTH_IN_FUTURE`
+
 ## Records of a villa
 
 Open works, small works, site reports and daily labour are written **for a villa**: the body carries `villaId`, the list filters by `villaId`, and each row shows `villa: { id, villaNumber, location }`. The villa cannot be changed afterwards (it is not in the change body); delete the record and make a new one. A list item and the single record are the same shape. Each of the four can be exported and imported ([imports-exports.md](imports-exports.md)).

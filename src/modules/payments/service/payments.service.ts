@@ -12,7 +12,7 @@ import type { StorageService } from "../../../core/storage/StorageService.js";
 import { buildMeta, toPagination } from "../../../shared/query/pagination.js";
 import { parseSort } from "../../../shared/query/sort.js";
 import { localDayOf } from "../../../shared/utils/deadline.js";
-import { isRecordNotFound } from "../../../shared/utils/index.js";
+import { foreignKeyConstraint, isRecordNotFound } from "../../../shared/utils/index.js";
 import { NOTE_HEAD_BYTES } from "../../materials/dto/materials.dto.js";
 import { noteFileName, noteTypeOf } from "../../materials/validators/materials.validators.js";
 import {
@@ -55,6 +55,14 @@ const badFile = (ctx: RequestContext) => fail(ctx, 400, "errors.paymentFileType"
 const fileLimit = (ctx: RequestContext) => fail(ctx, 409, "errors.paymentFileLimit", "PAYMENT_FILE_LIMIT");
 
 export type PaymentUpload = { tempPath: string; originalName: string };
+
+// The contractor or the villa was deleted between the check and the write: the foreign key stopped it. The constraint's
+// name says which.
+function partyGone(err: unknown, ctx: RequestContext): AppError | undefined {
+  const constraint = foreignKeyConstraint(err);
+  if (constraint === undefined) return undefined;
+  return constraint.includes("contractorId") ? contractorNotFound(ctx) : villaNotFound(ctx);
+}
 
 const asDay = (day: string): Date => new Date(`${day}T00:00:00.000Z`);
 
@@ -117,34 +125,39 @@ export class PaymentsService {
 
   async create(actor: Actor, input: CreatePaymentInput, ctx: RequestContext): Promise<PaymentDto> {
     const status: PaymentStatusValue = input.status ?? "PENDING";
-    const created = await this.repository.transaction(async (tx) => {
-      await this.assertParties(input.contractorId, input.villaId ?? null, ctx, tx);
-      const row = await this.repository.create(
-        {
-          contractorId: input.contractorId,
-          villaId: input.villaId ?? null,
-          amountMinor: BigInt(input.amountMinor),
-          status,
-          dueDate: input.dueDate ?? null,
-          paidDate: status === "PAID" ? (input.paidDate ?? asDay(this.today())) : null,
-          method: input.method ?? null,
-          reference: input.reference ?? null,
-          notes: input.notes ?? null,
-        },
-        tx,
-      );
-      await audit.record(
-        tx,
-        withMeta(ctx, {
-          actorId: actor.id,
-          action: "payment.create",
-          entity: ENTITY,
-          entityId: row.id,
-          after: toPaymentSnapshot(row),
-        }),
-      );
-      return row;
-    });
+    let created: PaymentRow;
+    try {
+      created = await this.repository.transaction(async (tx) => {
+        await this.assertParties(input.contractorId, input.villaId ?? null, ctx, tx);
+        const row = await this.repository.create(
+          {
+            contractorId: input.contractorId,
+            villaId: input.villaId ?? null,
+            amountMinor: BigInt(input.amountMinor),
+            status,
+            dueDate: input.dueDate ?? null,
+            paidDate: status === "PAID" ? (input.paidDate ?? asDay(this.today())) : null,
+            method: input.method ?? null,
+            reference: input.reference ?? null,
+            notes: input.notes ?? null,
+          },
+          tx,
+        );
+        await audit.record(
+          tx,
+          withMeta(ctx, {
+            actorId: actor.id,
+            action: "payment.create",
+            entity: ENTITY,
+            entityId: row.id,
+            after: toPaymentSnapshot(row),
+          }),
+        );
+        return row;
+      });
+    } catch (err) {
+      throw partyGone(err, ctx) ?? err;
+    }
     return toPaymentDto(created, this.today());
   }
 
@@ -203,7 +216,8 @@ export class PaymentsService {
       });
       return toPaymentDto(updated, this.today());
     } catch (err) {
-      throw isRecordNotFound(err) ? notFound(ctx) : err;
+      if (isRecordNotFound(err)) throw notFound(ctx);
+      throw partyGone(err, ctx) ?? err;
     }
   }
 

@@ -85,6 +85,7 @@ describe("migration order", () => {
       "contractor_payments",
       "variation_orders",
       "open_work_progress_updated",
+      "variation_order_number_ci",
     ]);
   });
 

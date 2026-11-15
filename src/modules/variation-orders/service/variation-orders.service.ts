@@ -10,7 +10,11 @@ import type { Actor, RequestContext } from "../../../core/middleware/requestCont
 import { LocalDiskStorage } from "../../../core/storage/LocalDiskStorage.js";
 import type { StorageService } from "../../../core/storage/StorageService.js";
 import { localDayOf } from "../../../shared/utils/deadline.js";
-import { isRecordNotFound, uniqueViolationConstraint } from "../../../shared/utils/index.js";
+import {
+  foreignKeyConstraint,
+  isRecordNotFound,
+  uniqueViolationConstraint,
+} from "../../../shared/utils/index.js";
 import { NOTE_HEAD_BYTES } from "../../materials/dto/materials.dto.js";
 import { noteFileName, noteTypeOf } from "../../materials/validators/materials.validators.js";
 import {
@@ -124,6 +128,8 @@ export class VariationOrdersService {
     } catch (err) {
       // Two saves of the same number at once: the unique index stops the second.
       if (uniqueViolationConstraint(err) !== undefined) throw numberTaken(ctx);
+      // The villa was deleted between the check and the insert: its foreign key stopped the insert.
+      if (foreignKeyConstraint(err) !== undefined) throw villaNotFound(ctx);
       throw err;
     }
   }

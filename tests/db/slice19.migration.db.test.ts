@@ -30,8 +30,8 @@ const slice19 = names.find((name) => name.endsWith("_slice19_schema"))!;
 const before = names.filter((name) => name < slice19);
 
 describe("the slice 19 migration file", () => {
-  it("comes before the later migrations (villa type, open work notifications, MEW follow up, progress ratio, no automatic open works, MEW states and inspection, MEW inspection passed, MEW inspection date, no ready for inspection, maintenance villas, material deliveries, material items, delivery note files, required default, no fixed materials, users delete permission, owner notes, owner from villa, foreman missions, contractor payments, variation orders, open work progress updated), and the script that checks it exists", () => {
-    expect(names.slice(-23)).toEqual([
+  it("comes before the later migrations (villa type, open work notifications, MEW follow up, progress ratio, no automatic open works, MEW states and inspection, MEW inspection passed, MEW inspection date, no ready for inspection, maintenance villas, material deliveries, material items, delivery note files, required default, no fixed materials, users delete permission, owner notes, owner from villa, foreman missions, contractor payments, variation orders, open work progress updated, variation order number ignoring case), and the script that checks it exists", () => {
+    expect(names.slice(-24)).toEqual([
       slice19,
       "20261112090000_villa_type",
       "20261113090000_open_work_notifications",
@@ -55,6 +55,7 @@ describe("the slice 19 migration file", () => {
       "20261201090000_contractor_payments",
       "20261215090000_variation_orders",
       "20261216090000_open_work_progress_updated",
+      "20261217090000_variation_order_number_ci",
     ]);
     expect(connectionOf("postgresql://u:p@localhost:5432/asico?schema=public")).toEqual({
       connectionString: "postgresql://u:p@localhost:5432/asico",

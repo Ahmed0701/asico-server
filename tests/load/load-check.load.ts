@@ -62,6 +62,8 @@ const PHASES = 8;
 const SMALL_WORKS_PER_VILLA = 60;
 const SITE_REPORTS_PER_VILLA = 25;
 const OPEN_WORKS_PER_VILLA = 25;
+const PAYMENTS_PER_VILLA = 20;
+const VARIATION_ORDERS_PER_VILLA = 5;
 const AUDIT_PER_DAY = number("LOAD_AUDIT_PER_DAY", 1250);
 const READ_RUNS = number("LOAD_READ_RUNS", 30);
 const WARMUP = 5;
@@ -305,6 +307,60 @@ describe.skipIf(!RUN)("the load check", () => {
     );
     auditId = (await q(`SELECT "id" FROM "AuditLog" ORDER BY "createdAt" DESC LIMIT 1`)).rows[0].id as string;
     log("audit log inserted");
+
+    // Payments to contractors: PAYMENTS_PER_VILLA a villa, a third paid, the rest pending (a part of them overdue).
+    await q(
+      `INSERT INTO "ContractorPayment" ("id","contractorId","villaId","amountMinor","status","dueDate","paidDate","method","reference","notes","updatedAt")
+       SELECT gen_random_uuid()::text, v."contractorId", v."id", 50000 + (k * 12345) % 9000000,
+              CASE WHEN k % 3 = 0 THEN 'PAID' ELSE 'PENDING' END::"PaymentStatus",
+              ${today} - 30 + k * 3, CASE WHEN k % 3 = 0 THEN ${today} - k END,
+              (ARRAY['CASH','CHEQUE','BANK_TRANSFER'])[1 + (k % 3)]::"PaymentMethod", 'CHQ-' || k || '-' || v."villaNumber",
+              CASE WHEN k % 4 = 0 THEN 'Advance for the next phase' END, now()
+       FROM "Villa" v CROSS JOIN generate_series(1, ${PAYMENTS_PER_VILLA}) k WHERE v."contractorId" IS NOT NULL`,
+    );
+    // Variation orders: VARIATION_ORDERS_PER_VILLA a villa, numbers unique in the villa, every other one paid.
+    await q(
+      `INSERT INTO "VariationOrder" ("id","villaId","voNumber","amountMinor","dateAdded","status","notes","updatedAt")
+       SELECT gen_random_uuid()::text, v."id", 'VO-' || k, 100000 * k, ${today} - 10 * k,
+              CASE WHEN k % 2 = 0 THEN 'PAID' ELSE 'PENDING' END::"PaymentStatus", 'Extra points requested by the owner', now()
+       FROM "Villa" v CROSS JOIN generate_series(1, ${VARIATION_ORDERS_PER_VILLA}) k`,
+    );
+    await q(
+      `INSERT INTO "OwnerNote" ("id","villaId","notes","doneAt","updatedAt")
+       SELECT gen_random_uuid()::text, v."id", 'The owner asked for extra sockets in the majlis, ' || v."villaNumber",
+              CASE WHEN (hashtext(v."id") & 1) = 0 THEN now() END, now()
+       FROM "Villa" v`,
+    );
+    await q(
+      `INSERT INTO "ForemanMission" ("id","villaId","notes","doneAt","updatedAt")
+       SELECT gen_random_uuid()::text, v."id", 'Check the conduits of the second floor, ' || v."villaNumber",
+              CASE WHEN (hashtext(v."id") & 2) = 0 THEN now() END, now()
+       FROM "Villa" v`,
+    );
+    await q(
+      `INSERT INTO "MaintenanceVilla" ("id","villaNumber","location","handoverDate","issue","updatedAt")
+       SELECT gen_random_uuid()::text, 'M-' || g, 'Area ' || (g % 20) || ' . B' || g || ' . ' || g, ${today} - g,
+              'The breaker trips when the AC starts, room ' || g, now()
+       FROM generate_series(1, 300) g`,
+    );
+    // The open works' history, as the service writes it: a create 90 days ago at 0, an edit 45 days ago to half, and one
+    // 10 days ago to the progress they have now. The monthly progress rebuilds past months from it.
+    await q(
+      `INSERT INTO "AuditLog" ("id","actorId","action","entity","entityId","before","after","createdAt")
+       SELECT gen_random_uuid()::text, '${adminId}', e.action, 'WorkItem', w."id", e.before, e.after, e.at
+       FROM "WorkItem" w
+       CROSS JOIN LATERAL (VALUES
+         ('open_work.create', NULL::jsonb,
+            jsonb_build_object('villaId', w."villaId", 'elecPhaseId', w."elecPhaseId", 'progress', 0), now() - interval '90 days'),
+         ('open_work.update',
+            jsonb_build_object('villaId', w."villaId", 'elecPhaseId', w."elecPhaseId", 'progress', 0),
+            jsonb_build_object('villaId', w."villaId", 'elecPhaseId', w."elecPhaseId", 'progress', w."progress" / 2), now() - interval '45 days'),
+         ('open_work.update',
+            jsonb_build_object('villaId', w."villaId", 'elecPhaseId', w."elecPhaseId", 'progress', w."progress" / 2),
+            jsonb_build_object('villaId', w."villaId", 'elecPhaseId', w."elecPhaseId", 'progress', w."progress"), now() - interval '10 days')
+       ) AS e(action, before, after, at)`,
+    );
+    log("payments, variation orders, notes, missions, maintenance and open work history inserted");
     await q("ANALYZE");
     log("analyzed");
   }
@@ -755,6 +811,46 @@ describe.skipIf(!RUN)("the load check", () => {
     );
     await get("/small-works?limit=20&search=fitting", "search", "GET /small-works?search");
     await get("/site-reports?limit=20&search=Visit", "search", "GET /site-reports?search");
+
+    // The newer pages.
+    await get("/payments?limit=20", "list", "GET /payments (page of 20, with totals)");
+    await get("/payments?limit=1000", "list", "GET /payments (1000 at once)");
+    await get("/payments?limit=20&overdue=true", "list", "GET /payments overdue");
+    await get("/payments?limit=20&sort=villaNumber:asc", "list", "GET /payments sorted by villa");
+    await get("/payments?limit=20&search=CHQ-7", "search", "GET /payments?search");
+    await get(`/payments?limit=20&contractorId=${contractorId}`, "list", "GET /payments of one contractor");
+    await get(`/villas/${villaId}/variation-orders`, "list", "GET /villas/:id/variation-orders");
+    await get("/owner-notes?limit=20", "list", "GET /owner-notes (page of 20)");
+    await get("/foreman-missions?limit=20", "list", "GET /foreman-missions (page of 20)");
+    await get("/maintenance?limit=20", "list", "GET /maintenance (page of 20)");
+    await get(
+      "/monthly-progress?limit=50",
+      "dashboard",
+      "GET /monthly-progress (this month, rebuilt from history)",
+    );
+    await get(
+      `/monthly-progress?limit=50&month=${(() => {
+        const d = new Date();
+        d.setUTCDate(1);
+        d.setUTCMonth(d.getUTCMonth() - 2);
+        return d.toISOString().slice(0, 7);
+      })()}`,
+      "dashboard",
+      "GET /monthly-progress (two months back)",
+    );
+    await get(
+      "/monthly-progress?limit=50&sort=change:desc",
+      "dashboard",
+      "GET /monthly-progress sorted by change",
+    );
+    // Every villa is there, and the history moved them: the open works went from half to their progress now 10 days ago.
+    const monthly = await request(server)
+      .get("/api/v1/monthly-progress?limit=1000")
+      .set("Authorization", await bearer());
+    expect(monthly.body.meta.total).toBe(VILLAS);
+    expect(monthly.body.data.some((item: { currentProgress: number }) => item.currentProgress > 0)).toBe(
+      true,
+    );
 
     await get("/audit-logs?limit=20", "list", "GET /audit-logs (page of 20)");
     await get(

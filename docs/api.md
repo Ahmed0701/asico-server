@@ -210,6 +210,12 @@ Deliveries from the switchgear and cable factories to the villas, each with its 
 | `GET`    | `/villa-documents/:id/file`     | `public`                   | —               | —        | The file, for a valid signed link (`?token=`)  |
 | `DELETE` | `/villa-documents/:id`          | `villa-documents:delete`   | —               | —        | Delete a document                              |
 
+### Monthly progress
+
+| Method | Path                | Access        | Idempotency-Key | If-Match | Purpose                                                                                                                                                                             |
+| ------ | ------------------- | ------------- | --------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/monthly-progress` | `villas:read` | —               | —        | Each villa's overall progress at the end of the month before and of `month` (YYYY-MM, default the current month: as of now), with the change and a summary (page, `search`, `sort`) |
+
 ### Variation orders
 
 The Variation Orders card of the villa page. Seen with `villas:read`, changed with `villas:update`.

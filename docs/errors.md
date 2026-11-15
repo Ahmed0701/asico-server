@@ -160,6 +160,7 @@ See [write-safety.md](write-safety.md).
 | `VARIATION_ORDER_NUMBER_TAKEN`        | 409    | The villa already has a variation order with this VO number (case-insensitive).                                                     |
 | `VARIATION_ORDER_FILE_NOT_FOUND`      | 404    | No such file on this variation order.                                                                                               |
 | `VARIATION_ORDER_FILE_LIMIT`          | 409    | The variation order would hold more than 10 files.                                                                                  |
+| `MONTH_IN_FUTURE`                     | 400    | The monthly progress was asked for a month after the current one (APP_TIMEZONE).                                                    |
 
 ### Documents
 
