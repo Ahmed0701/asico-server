@@ -300,10 +300,11 @@ The Variation Orders card of the villa page. Seen with `villas:read`, changed wi
 
 ### Dashboard
 
-| Method | Path                         | Access           | Idempotency-Key | If-Match | Purpose                                                      |
-| ------ | ---------------------------- | ---------------- | --------------- | -------- | ------------------------------------------------------------ |
-| `GET`  | `/dashboard/summary`         | `dashboard:read` | —               | —        | The dashboard cards the caller may see (the others are null) |
-| `GET`  | `/dashboard/recent-activity` | `dashboard:read` | —               | —        | The latest audit entries, for the dashboard (`limit`)        |
+| Method | Path                         | Access           | Idempotency-Key | If-Match | Purpose                                                       |
+| ------ | ---------------------------- | ---------------- | --------------- | -------- | ------------------------------------------------------------- |
+| `GET`  | `/dashboard/summary`         | `dashboard:read` | —               | —        | The dashboard cards the caller may see (the others are null)  |
+| `GET`  | `/dashboard/recent-activity` | `dashboard:read` | —               | —        | The latest audit entries, for the dashboard (`limit`)         |
+| `GET`  | `/dashboard/charts`          | `dashboard:read` | —               | —        | The dashboard charts the caller may see (the others are null) |
 
 ### Notifications
 

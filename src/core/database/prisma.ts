@@ -1,6 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../../generated/prisma/client.js";
 import { env } from "../config/env.js";
+import { TRANSACTION_DEFAULTS } from "./transactions.js";
 
 const adapter = new PrismaPg({
   connectionString: env.DATABASE_URL,
@@ -9,4 +10,4 @@ const adapter = new PrismaPg({
   idleTimeoutMillis: env.DB_IDLE_TIMEOUT_MS,
 });
 
-export const prisma = new PrismaClient({ adapter });
+export const prisma = new PrismaClient({ adapter, transactionOptions: TRANSACTION_DEFAULTS });

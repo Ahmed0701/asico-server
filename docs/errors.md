@@ -38,27 +38,28 @@ The tables are checked against the source by `tests/docs/errors.docs.test.ts`: a
 
 ### Request, signing in and access
 
-| Code                       | Status | When                                                                                                                                              |
-| -------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BAD_REQUEST`              | 400    | A body that is not valid JSON, or another client mistake the framework reports.                                                                   |
-| `VALIDATION_ERROR`         | 400    | A field, query parameter or path parameter is invalid. `details` lists each one.                                                                  |
-| `INVALID_STORAGE_KEY`      | 400    | A stored file's key is not a safe path (a defence: a client cannot cause it).                                                                     |
-| `UNAUTHORIZED`             | 401    | No `Authorization: Bearer` token, or a token that is not valid.                                                                                   |
-| `TOKEN_EXPIRED`            | 401    | The access token has expired. Call `POST /auth/refresh`, then repeat the request.                                                                 |
-| `INVALID_CREDENTIALS`      | 401    | Wrong email or password. The same answer for an unknown email, so it does not say which was wrong.                                                |
-| `INVALID_REFRESH_TOKEN`    | 401    | The refresh cookie is missing, unknown or expired. The cookie is removed; sign in again.                                                          |
-| `REFRESH_TOKEN_REUSED`     | 401    | A refresh token that was already used came back (it may have been stolen): every refresh token of the user is revoked. Sign in again.             |
-| `FORBIDDEN`                | 403    | The signed-in user does not hold the permission the route needs.                                                                                  |
-| `ACCOUNT_INACTIVE`         | 403    | The password is right and the account is not active (a new sign-up waits for an administrator, or the user was deactivated). Also from a refresh. |
-| `NOT_FOUND`                | 404    | No such path.                                                                                                                                     |
-| `TOO_MANY_REQUESTS`        | 429    | A rate limit was hit (the answer carries `Retry-After`). See [operations.md](operations.md#rate-limits).                                          |
-| `PAYLOAD_TOO_LARGE`        | 413    | The JSON body is over `BODY_LIMIT`.                                                                                                               |
-| `INTERNAL_ERROR`           | 500    | Anything unexpected. The cause is in the log under the `requestId`.                                                                               |
-| `REFRESH_CONFLICT`         | 409    | Two requests rotated the same refresh token at once. The cookie is kept: repeat the call.                                                         |
-| `SIGNUP_DISABLED`          | 403    | Public sign-up is turned off (`AUTH_SIGNUP_ENABLED`, off by default in production): an administrator creates users.                               |
-| `EMAIL_TAKEN`              | 409    | Sign-up, or a user's email, is already registered.                                                                                                |
-| `INVALID_CURRENT_PASSWORD` | 400    | `POST /auth/change-password` with a wrong current password.                                                                                       |
-| `INVALID_RESET_TOKEN`      | 400    | A reset link that is wrong, used or expired.                                                                                                      |
+| Code                       | Status | When                                                                                                                                                                                      |
+| -------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BAD_REQUEST`              | 400    | A body that is not valid JSON, or another client mistake the framework reports.                                                                                                           |
+| `VALIDATION_ERROR`         | 400    | A field, query parameter or path parameter is invalid. `details` lists each one.                                                                                                          |
+| `INVALID_STORAGE_KEY`      | 400    | A stored file's key is not a safe path (a defence: a client cannot cause it).                                                                                                             |
+| `UNAUTHORIZED`             | 401    | No `Authorization: Bearer` token, or a token that is not valid.                                                                                                                           |
+| `TOKEN_EXPIRED`            | 401    | The access token has expired. Call `POST /auth/refresh`, then repeat the request.                                                                                                         |
+| `INVALID_CREDENTIALS`      | 401    | Wrong email or password. The same answer for an unknown email, so it does not say which was wrong.                                                                                        |
+| `INVALID_REFRESH_TOKEN`    | 401    | The refresh cookie is missing, unknown or expired. The cookie is removed; sign in again.                                                                                                  |
+| `REFRESH_TOKEN_REUSED`     | 401    | A refresh token that was already used came back (it may have been stolen): every refresh token of the user is revoked. Sign in again.                                                     |
+| `FORBIDDEN`                | 403    | The signed-in user does not hold the permission the route needs.                                                                                                                          |
+| `ACCOUNT_INACTIVE`         | 403    | The password is right and the account is not active (a new sign-up waits for an administrator, or the user was deactivated). Also from a refresh.                                         |
+| `NOT_FOUND`                | 404    | No such path.                                                                                                                                                                             |
+| `TOO_MANY_REQUESTS`        | 429    | A rate limit was hit (the answer carries `Retry-After`). See [operations.md](operations.md#rate-limits).                                                                                  |
+| `PAYLOAD_TOO_LARGE`        | 413    | The JSON body is over `BODY_LIMIT`.                                                                                                                                                       |
+| `INTERNAL_ERROR`           | 500    | Anything unexpected. The cause is in the log under the `requestId`.                                                                                                                       |
+| `SERVICE_BUSY`             | 503    | The database was too busy to answer in time (no free connection, or a transaction that could not start or ran past its time). Comes with `Retry-After: 2`; the request may be sent again. |
+| `REFRESH_CONFLICT`         | 409    | Two requests rotated the same refresh token at once. The cookie is kept: repeat the call.                                                                                                 |
+| `SIGNUP_DISABLED`          | 403    | Public sign-up is turned off (`AUTH_SIGNUP_ENABLED`, off by default in production): an administrator creates users.                                                                       |
+| `EMAIL_TAKEN`              | 409    | Sign-up, or a user's email, is already registered.                                                                                                                                        |
+| `INVALID_CURRENT_PASSWORD` | 400    | `POST /auth/change-password` with a wrong current password.                                                                                                                               |
+| `INVALID_RESET_TOKEN`      | 400    | A reset link that is wrong, used or expired.                                                                                                                                              |
 
 ### Users and permissions
 

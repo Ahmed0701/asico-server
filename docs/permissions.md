@@ -110,7 +110,7 @@ A code is `<resource>:<action>`. The table is the whole list: a route that is no
 | `users:deactivate`            | `PATCH /users/:id/activate`<br>`PATCH /users/:id/deactivate`                                                                                                                                                                                                                                                                               |
 | `permissions:assign`          | `GET /permissions`<br>`GET /users/:id/permissions`<br>`PUT /users/:id/permissions`                                                                                                                                                                                                                                                         |
 | `audit:read`                  | `GET /audit-logs/export`<br>`GET /audit-logs`<br>`GET /audit-logs/filters`<br>`GET /audit-logs/:id`                                                                                                                                                                                                                                        |
-| `dashboard:read`              | `GET /dashboard/summary`<br>`GET /dashboard/recent-activity`                                                                                                                                                                                                                                                                               |
+| `dashboard:read`              | `GET /dashboard/summary`<br>`GET /dashboard/recent-activity`<br>`GET /dashboard/charts`                                                                                                                                                                                                                                                    |
 
 ### Things the table does not make obvious
 
@@ -125,7 +125,7 @@ A code is `<resource>:<action>`. The table is the whole list: a route that is no
 
 ## The dashboard
 
-`dashboard:read` opens both dashboard routes. `GET /dashboard/summary` is then worked out card by card: a card is computed only for a caller who holds **every** permission listed for it (an ADMIN holds them all), and is `null` in the answer otherwise, so the page can hide it. A card with nothing to count is not `null`: it holds zeros. The recent activity (`GET /dashboard/recent-activity`) lists the latest audit entries, in the same shape as an audit list item, to anyone with `dashboard:read`; the audit log itself, with its filters, detail and export, stays behind `audit:read`.
+`dashboard:read` opens the dashboard routes. `GET /dashboard/summary` is then worked out card by card: a card is computed only for a caller who holds **every** permission listed for it (an ADMIN holds them all), and is `null` in the answer otherwise, so the page can hide it. A card with nothing to count is not `null`: it holds zeros. The recent activity (`GET /dashboard/recent-activity`) lists the latest audit entries, in the same shape as an audit list item, to anyone with `dashboard:read`; the audit log itself, with its filters, detail and export, stays behind `audit:read`.
 
 | Card                | Needs                             |
 | ------------------- | --------------------------------- |
@@ -142,5 +142,14 @@ A code is `<resource>:<action>`. The table is the whole list: a route that is no
 | `ownerNotes`        | `owner-notes:read`                |
 | `foremanMissions`   | `foreman-missions:read`           |
 | `payments`          | `payments:read`                   |
+
+`GET /dashboard/charts` is worked out the same way, chart by chart:
+
+| Chart             | Needs               |
+| ----------------- | ------------------- |
+| `progressTrend`   | `villas:read`       |
+| `phaseStatus`     | `open-works:read`   |
+| `labourByDay`     | `daily-labour:read` |
+| `paymentsByMonth` | `payments:read`     |
 
 The `villas` card carries the keys `villas`, `progress`, `overdue`, `upcoming`, `mewFollowUp`, `mewInspection` and `byArea`; they are all `null` together. The shape is in [frontend-contract.md](frontend-contract.md#dashboard).

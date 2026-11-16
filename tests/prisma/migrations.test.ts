@@ -86,6 +86,7 @@ describe("migration order", () => {
       "variation_orders",
       "open_work_progress_updated",
       "variation_order_number_ci",
+      "work_item_villa_phase_index",
     ]);
   });
 

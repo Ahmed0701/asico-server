@@ -614,6 +614,7 @@ model WorkItem {
   notifications       Notification[]
 
   @@index([villaId, status])
+  @@index([villaId, elecPhaseId])
   @@index([status])
   @@index([endDate])
   @@index([contractorId])

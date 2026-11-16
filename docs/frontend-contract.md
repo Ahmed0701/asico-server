@@ -1791,7 +1791,60 @@ An employee who holds only `dashboard:read`, `villas:read` and `daily-reports:re
 | --------- | ----------------------------- | ----------------- |
 | `limit`   | integer, 1 to 50 (default 20) | How many entries. |
 
-<!-- modules: dashboard -->
+### Charts
+
+`GET /dashboard/charts` answers `{ data: DashboardChartsDto }`, cut chart by chart like the summary (see [permissions.md](permissions.md#the-dashboard)): a chart the caller may not see is `null`.
+
+- `progressTrend`: the last 6 months (APP_TIMEZONE), oldest first. Each is the villas' average overall progress at the month's end (now for the current month), rebuilt from the open works' history like the monthly progress; the current month counts every villa there is.
+- `phaseStatus`: every active electrical phase in display order, with its open works by status.
+- `labourByDay`: the last 14 UTC days, oldest first, today included; a day without labour is 0.
+- `paymentsByMonth`: the last 6 months, oldest first, by paid date; a month without a payment is 0.
+
+#### `DashboardChartsDto`
+
+| Field             | Type                              | Notes                                   |
+| ----------------- | --------------------------------- | --------------------------------------- |
+| `progressTrend`   | `ProgressTrendPointDto[] \| null` | Needs `villas:read`.                    |
+| `phaseStatus`     | `PhaseStatusRowDto[] \| null`     | Needs `open-works:read`.                |
+| `labourByDay`     | `LabourDayDto[] \| null`          | Needs `daily-labour:read`.              |
+| `paymentsByMonth` | `PaymentMonthDto[] \| null`       | Needs `payments:read`.                  |
+| `generatedAt`     | `string`                          | ISO 8601 instant the figures were read. |
+
+#### `ProgressTrendPointDto`
+
+| Field     | Type     | Notes                                            |
+| --------- | -------- | ------------------------------------------------ |
+| `month`   | `string` | YYYY-MM.                                         |
+| `average` | `number` | Average overall progress, 0 to 100, one decimal. |
+| `done`    | `number` | Villas at 100.                                   |
+| `villas`  | `number` | Villas counted.                                  |
+
+#### `PhaseStatusRowDto`
+
+| Field         | Type     | Notes                   |
+| ------------- | -------- | ----------------------- |
+| `elecPhaseId` | `string` | The phase.              |
+| `name`        | `string` | Its name.               |
+| `notStarted`  | `number` | Open works not started. |
+| `inProgress`  | `number` | In progress.            |
+| `delayed`     | `number` | Delayed.                |
+| `done`        | `number` | Done.                   |
+
+#### `LabourDayDto`
+
+| Field     | Type     | Notes                                             |
+| --------- | -------- | ------------------------------------------------- |
+| `day`     | `string` | YYYY-MM-DD (UTC).                                 |
+| `workers` | `number` | Workers on the daily labour that day, all villas. |
+
+#### `PaymentMonthDto`
+
+| Field       | Type     | Notes                      |
+| ----------- | -------- | -------------------------- |
+| `month`     | `string` | YYYY-MM.                   |
+| `paidMinor` | `number` | Paid that month, KWD fils. |
+
+<!-- modules: dashboard, dashboard-charts -->
 
 **Errors:** none of its own
 

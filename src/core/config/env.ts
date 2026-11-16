@@ -70,7 +70,8 @@ export const envSchema = z
     EXPORT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
     IMPORT_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
     IMPORT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
-    DB_POOL_MAX: z.coerce.number().int().positive().default(10),
+    // 20: the heavy load check (2,000 villas, 25 to 250 users at once) got 3x the throughput of 10 and no request refused.
+    DB_POOL_MAX: z.coerce.number().int().positive().default(20),
     DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
     DB_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),

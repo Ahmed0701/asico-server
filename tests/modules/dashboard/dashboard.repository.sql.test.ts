@@ -87,8 +87,8 @@ describe("the daily reports counters", () => {
         text:
           `SELECT count(*) FILTER (WHERE r."reportDate" = ?::date) AS "today", ` +
           `count(*) FILTER ( WHERE r."reportDate" >= ?::date AND r."reportDate" <= ?::date ) AS "last7Days" ` +
-          `FROM "DailyReport" r`,
-        values: ["2026-10-12", "2026-10-06", "2026-10-12"],
+          `FROM "DailyReport" r WHERE r."reportDate" >= ?::date AND r."reportDate" <= ?::date`,
+        values: ["2026-10-12", "2026-10-06", "2026-10-12", "2026-10-06", "2026-10-12"],
       },
     ]);
   });
@@ -144,18 +144,17 @@ describe("the site reports counter", () => {
 
 describe("the labour counters", () => {
   it("add up the labour counts of today and of the window that ends with today", async () => {
-    const { db, calls } = recorder([{ today: 5n, last7Days: 9n, total: 42n }]);
+    const { db, calls } = recorder([{ today: 5n, last7Days: 9n }]);
 
-    expect(await repository.labourCounters(range, db)).toEqual({ today: 5n, last7Days: 9n, total: 42n });
+    expect(await repository.labourCounters(range, db)).toEqual({ today: 5n, last7Days: 9n });
 
     expect(calls).toEqual([
       {
         text:
           `SELECT COALESCE(sum(l."labourCount") FILTER (WHERE l."labourDate" = ?::date), 0) AS "today", ` +
-          `COALESCE(sum(l."labourCount") FILTER ( WHERE l."labourDate" >= ?::date AND l."labourDate" <= ?::date ), 0) AS "last7Days", ` +
-          `COALESCE(sum(l."labourCount"), 0) AS "total" ` +
-          `FROM "DailyLabour" l`,
-        values: ["2026-10-12", "2026-10-06", "2026-10-12"],
+          `COALESCE(sum(l."labourCount") FILTER ( WHERE l."labourDate" >= ?::date AND l."labourDate" <= ?::date ), 0) AS "last7Days" ` +
+          `FROM "DailyLabour" l WHERE l."labourDate" >= ?::date AND l."labourDate" <= ?::date`,
+        values: ["2026-10-12", "2026-10-06", "2026-10-12", "2026-10-06", "2026-10-12"],
       },
     ]);
   });

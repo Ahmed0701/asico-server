@@ -54,14 +54,25 @@ export async function deleteRowsAtZero(phaseId: string, db: Db): Promise<void> {
   await db.villaPhaseProgress.deleteMany({ where: { elecPhaseId: phaseId, progress: 0 } });
 }
 
-// The progress of phase `ph` on villa `v`, for SQL that names them so: the average progress of the villa's open works
-// filed under the phase (any source, any status), or 0 when it has none. The phase progress rows do not count. The
-// TypeScript twin is phaseProgressOf.
-export const PHASE_PROGRESS = Prisma.sql`COALESCE(
-  (SELECT avg(wi."progress") FROM "WorkItem" wi WHERE wi."villaId" = v."id" AND wi."elecPhaseId" = ph."id"),
-  0
-)`;
+// The average progress of the open works of each villa under each phase (any source, any status), in one grouped pass:
+// a table of ("villaId", "elecPhaseId", "progress"). `villaIds` keeps only those villas (all when omitted). SQL joins it as
+// "wp" with `LEFT JOIN ${WORK_PHASE_PROGRESS(...)} wp ON wp."villaId" = v."id" AND wp."elecPhaseId" = ph."id"`. One pass
+// instead of a sub-query a villa and phase: the cost grows with the open works, not with villas x phases x open works.
+export function WORK_PHASE_PROGRESS(villaIds?: readonly string[]): Prisma.Sql {
+  const where =
+    villaIds === undefined
+      ? Prisma.empty
+      : villaIds.length === 0
+        ? Prisma.sql`WHERE false`
+        : Prisma.sql`WHERE "villaId" IN (${Prisma.join([...villaIds])})`;
+  return Prisma.sql`(SELECT "villaId", "elecPhaseId", avg("progress") AS "progress" FROM "WorkItem" ${where} GROUP BY 1, 2)`;
+}
 
-// What active phase `ph` adds to villa `v`'s overall progress: its whole progress ratio once the villa's open work for it
-// is done (PHASE_PROGRESS at 100), and 0 before that. The TypeScript twin is doneRatioOf.
+// The progress of phase `ph` on villa `v`, with WORK_PHASE_PROGRESS joined as "wp": the average progress of the villa's
+// open works filed under the phase, or 0 when it has none. The phase progress rows do not count. The TypeScript twin is
+// phaseProgressOf.
+export const PHASE_PROGRESS = Prisma.sql`COALESCE(wp."progress", 0)`;
+
+// What active phase `ph` adds to villa `v`'s overall progress (with "wp" joined): its whole progress ratio once the
+// villa's open work for it is done (PHASE_PROGRESS at 100), and 0 before that. The TypeScript twin is doneRatioOf.
 export const PHASE_DONE_RATIO = Prisma.sql`(CASE WHEN ${PHASE_PROGRESS} >= 100 THEN ph."progressRatio" ELSE 0 END)`;

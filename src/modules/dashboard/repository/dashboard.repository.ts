@@ -1,6 +1,10 @@
 import { prisma } from "../../../core/database/prisma.js";
 import type { Prisma } from "../../../generated/prisma/client.js";
-import { PHASE_DONE_RATIO, PHASE_PROGRESS } from "../../villa-progress/repository/progress-rows.js";
+import {
+  PHASE_DONE_RATIO,
+  PHASE_PROGRESS,
+  WORK_PHASE_PROGRESS,
+} from "../../villa-progress/repository/progress-rows.js";
 import { AuditRepository, auditLogListSelect, type AuditLogListRow } from "../../audit/index.js";
 import { toDay } from "../../../shared/utils/day.js";
 import type { AlertWindow } from "../../../shared/utils/deadline.js";
@@ -52,7 +56,7 @@ export type OpenWorkCounterRow = {
 };
 // Rows of today and of the window that ends with it (daily reports); for the labour the sum of the labour counts.
 export type DailyCounterRow = { today: Count; last7Days: Count };
-export type LabourCounterRow = DailyCounterRow & { total: Count };
+export type LabourCounterRow = DailyCounterRow;
 // All the small works, the pending ones, and how many of those are due soon and overdue (the list's own rule:
 // shared/utils/deadline.ts).
 export type SmallWorkCounterRow = { total: Count; pending: Count; dueSoon: Count; overdue: Count };
@@ -135,6 +139,7 @@ export class DashboardRepository {
         SELECT v."id" AS "villaId", ${PHASE_PROGRESS} AS "progress", ${PHASE_DONE_RATIO} AS "doneRatio"
         FROM "Villa" v
         CROSS JOIN "ElecPhase" ph
+        LEFT JOIN ${WORK_PHASE_PROGRESS()} wp ON wp."villaId" = v."id" AND wp."elecPhaseId" = ph."id"
         WHERE ph."status" = 'ACTIVE'
       ),
       per AS (
@@ -212,6 +217,7 @@ export class DashboardRepository {
   }
 
   // The reports written for today, and for the window of the last 7 days (the day of the report, not when it was made).
+  // Only the week is read (the WHERE goes through the date index), not every report there is.
   async dailyReportCounters({ today, weekStart }: DayRange, db: Db = prisma): Promise<DailyCounterRow> {
     const rows = await db.$queryRaw<DailyCounterRow[]>`
       SELECT
@@ -219,7 +225,8 @@ export class DashboardRepository {
         count(*) FILTER (
           WHERE r."reportDate" >= ${asDay(weekStart)}::date AND r."reportDate" <= ${asDay(today)}::date
         ) AS "last7Days"
-      FROM "DailyReport" r`;
+      FROM "DailyReport" r
+      WHERE r."reportDate" >= ${asDay(weekStart)}::date AND r."reportDate" <= ${asDay(today)}::date`;
     return only(rows, "daily reports");
   }
 
@@ -257,15 +264,16 @@ export class DashboardRepository {
   }
 
   // The labourers of today and of the window, added up (not the number of rows).
+  // Only the week is read (the WHERE goes through the date index), not every labour row there is.
   async labourCounters({ today, weekStart }: DayRange, db: Db = prisma): Promise<LabourCounterRow> {
     const rows = await db.$queryRaw<LabourCounterRow[]>`
       SELECT
         COALESCE(sum(l."labourCount") FILTER (WHERE l."labourDate" = ${asDay(today)}::date), 0) AS "today",
         COALESCE(sum(l."labourCount") FILTER (
           WHERE l."labourDate" >= ${asDay(weekStart)}::date AND l."labourDate" <= ${asDay(today)}::date
-        ), 0) AS "last7Days",
-        COALESCE(sum(l."labourCount"), 0) AS "total"
-      FROM "DailyLabour" l`;
+        ), 0) AS "last7Days"
+      FROM "DailyLabour" l
+      WHERE l."labourDate" >= ${asDay(weekStart)}::date AND l."labourDate" <= ${asDay(today)}::date`;
     return only(rows, "labour");
   }
 
@@ -279,7 +287,8 @@ export class DashboardRepository {
       SELECT
         COALESCE(sum(r."workersCount") FILTER (WHERE r."reportDate" = ${asDay(today)}::date), 0) AS "today",
         COALESCE(sum(r."workersCount") FILTER (WHERE r."reportDate" = ${asDay(today)}::date - 1), 0) AS "yesterday"
-      FROM "DailyReport" r`;
+      FROM "DailyReport" r
+      WHERE r."reportDate" >= ${asDay(today)}::date - 1 AND r."reportDate" <= ${asDay(today)}::date`;
     return only(rows, "daily report workers");
   }
 

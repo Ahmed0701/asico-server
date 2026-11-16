@@ -7,6 +7,7 @@
   "errors.payloadTooLarge": "Request body too large",
   "errors.tooManyRequests": "Too many requests",
   "errors.internal": "Internal server error",
+  "errors.serviceBusy": "The server is busy. Please try again in a moment",
   "errors.invalidCredentials": "Invalid email or password",
   "errors.accountInactive": "Your account is not active yet",
   "errors.signupDisabled": "Sign-up is turned off. Ask an administrator to create your account.",

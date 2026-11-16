@@ -1,5 +1,6 @@
 import { prisma } from "../../../core/database/prisma.js";
 import { Prisma } from "../../../generated/prisma/client.js";
+import { WORK_PHASE_PROGRESS } from "../../villa-progress/repository/progress-rows.js";
 import type { PhaseRatio, WorkEvent, WorkNow } from "../service/progress-history.js";
 
 export type Db = Prisma.TransactionClient;
@@ -45,6 +46,16 @@ export class MonthlyProgressRepository {
 
   activePhases(db: Db = prisma): Promise<PhaseRatio[]> {
     return db.elecPhase.findMany({ where: { status: "ACTIVE" }, select: { id: true, progressRatio: true } });
+  }
+
+  // The average progress of each villa's open works under each phase, as they are now: one row a villa and phase.
+  async currentPhaseAverages(
+    db: Db = prisma,
+  ): Promise<{ villaId: string; elecPhaseId: string; progress: number }[]> {
+    const rows = await db.$queryRaw<{ villaId: string; elecPhaseId: string; progress: number }[]>(
+      Prisma.sql`SELECT wp."villaId", wp."elecPhaseId", wp."progress"::float8 AS "progress" FROM ${WORK_PHASE_PROGRESS()} wp`,
+    );
+    return rows.map((row) => ({ ...row, progress: Number(row.progress) }));
   }
 
   works(db: Db = prisma): Promise<WorkNow[]> {

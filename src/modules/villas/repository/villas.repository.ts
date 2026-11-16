@@ -11,6 +11,7 @@ import {
   insertRowsForVillas,
   lockPhaseSet,
   PHASE_DONE_RATIO,
+  WORK_PHASE_PROGRESS,
 } from "../../villa-progress/repository/progress-rows.js";
 import { doneRatioOf, phaseProgressOf } from "../../villa-progress/dto/villa-progress.dto.js";
 import {
@@ -255,7 +256,7 @@ function orderBy({ field, direction }: VillaSort): Prisma.Sql {
     case "villaNumber":
       return Prisma.sql`${natural(Prisma.sql`v."villaNumber"`)}, v."id" ASC`;
     case "progress":
-      return Prisma.sql`pr."average" ${way}, v."id" ASC`;
+      return Prisma.sql`COALESCE(pr."average", 0) ${way}, v."id" ASC`;
     case "targetDate":
       return Prisma.sql`v."targetDate" ${way} NULLS LAST, v."id" ASC`;
     case "createdAt":
@@ -263,15 +264,17 @@ function orderBy({ field, direction }: VillaSort): Prisma.Sql {
   }
 }
 
-// Sorting by progress joins each villa to the weighted average of its active phases, unrounded (a villa with no active
-// phases is at 0). A phase's progress is read from the villa's open works (PHASE_PROGRESS). Only that sort pays for the join.
+// Sorting by progress joins each villa to what its done active phases add up to (at most 100); a villa with no open work
+// in a done phase is not in it and counts as 0. A phase's progress is read from the villa's open works, in one grouped
+// pass (WORK_PHASE_PROGRESS). Only that sort pays for the join.
 function joinsOf({ field }: VillaSort): Prisma.Sql {
   return field === "progress"
-    ? Prisma.sql`LEFT JOIN LATERAL (
-        SELECT LEAST(100, COALESCE(sum(${PHASE_DONE_RATIO}), 0)) AS "average"
-        FROM "ElecPhase" ph
-        WHERE ph."status" = 'ACTIVE'
-      ) pr ON true`
+    ? Prisma.sql`LEFT JOIN (
+        SELECT wp."villaId", LEAST(100, COALESCE(sum(${PHASE_DONE_RATIO}), 0)) AS "average"
+        FROM ${WORK_PHASE_PROGRESS()} wp
+        JOIN "ElecPhase" ph ON ph."id" = wp."elecPhaseId" AND ph."status" = 'ACTIVE'
+        GROUP BY wp."villaId"
+      ) pr ON pr."villaId" = v."id"`
     : Prisma.empty;
 }
 
@@ -375,6 +378,7 @@ export class VillasRepository {
           count(ph."id")::int AS "phaseCount"
         FROM "Villa" v
         CROSS JOIN "ElecPhase" ph
+        LEFT JOIN ${WORK_PHASE_PROGRESS(villaIds)} wp ON wp."villaId" = v."id" AND wp."elecPhaseId" = ph."id"
         WHERE ph."status" = 'ACTIVE' AND v."id" IN (${Prisma.join(villaIds)})
         GROUP BY v."id"`,
     );

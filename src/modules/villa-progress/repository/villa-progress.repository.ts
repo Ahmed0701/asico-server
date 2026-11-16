@@ -1,6 +1,6 @@
 import { prisma } from "../../../core/database/prisma.js";
 import { Prisma } from "../../../generated/prisma/client.js";
-import { PHASE_DONE_RATIO } from "./progress-rows.js";
+import { PHASE_DONE_RATIO, WORK_PHASE_PROGRESS } from "./progress-rows.js";
 
 export type Db = Prisma.TransactionClient;
 
@@ -89,6 +89,7 @@ export class VillaProgressRepository {
       Prisma.sql`SELECT COALESCE(sum(${PHASE_DONE_RATIO}), 0)::int AS "doneRatio", count(ph."id")::int AS "count"
         FROM "ElecPhase" ph
         CROSS JOIN (SELECT ${villaId}::text AS "id") v
+        LEFT JOIN ${WORK_PHASE_PROGRESS([villaId])} wp ON wp."villaId" = v."id" AND wp."elecPhaseId" = ph."id"
         WHERE ph."status" = 'ACTIVE'`,
     );
     return rows[0] ?? { doneRatio: 0, count: 0 };

@@ -2,6 +2,7 @@ import type { ErrorRequestHandler } from "express";
 import { logger } from "../config/logger.js";
 import { t } from "../i18n/index.js";
 import type { LocaleCode } from "../../shared/constants/enums.js";
+import { isDatabaseBusy } from "../database/transactions.js";
 import { AppError } from "./AppError.js";
 
 function clientStatus(err: unknown): number | undefined {
@@ -27,6 +28,15 @@ function fromClientError(err: unknown, locale: LocaleCode): AppError | undefined
 export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   if (res.headersSent) {
     next(err);
+    return;
+  }
+
+  // Too busy to answer in time: a 503 the client may retry, logged as a warning (it is load, not a bug).
+  if (isDatabaseBusy(err)) {
+    logger.warn({ err, requestId: req.requestId }, "database busy");
+    const busy = new AppError(503, t(req.locale, "errors.serviceBusy"), "SERVICE_BUSY");
+    res.setHeader("Retry-After", "2");
+    res.status(busy.statusCode).json({ code: busy.code, message: busy.message, requestId: req.requestId });
     return;
   }
 

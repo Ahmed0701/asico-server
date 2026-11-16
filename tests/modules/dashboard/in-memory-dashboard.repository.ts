@@ -277,7 +277,6 @@ export class InMemoryDashboardRepository implements DashboardRepository {
     return {
       today: sum((day) => day === today.getTime()),
       last7Days: sum((day) => day >= weekStart.getTime() && day <= today.getTime()),
-      total: rows.reduce((acc, row) => acc + row.labourCount, 0),
     };
   }
 

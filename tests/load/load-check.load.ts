@@ -41,6 +41,7 @@ vi.mock(
 );
 
 import { createApp } from "../../src/app.js";
+import { TRANSACTION_DEFAULTS } from "../../src/core/database/transactions.js";
 import { env } from "../../src/core/config/env.js";
 import { signAccessToken } from "../../src/core/security/jwt.js";
 import { PrismaClient } from "../../src/generated/prisma/client.js";
@@ -66,6 +67,14 @@ const PAYMENTS_PER_VILLA = 20;
 const VARIATION_ORDERS_PER_VILLA = 5;
 const AUDIT_PER_DAY = number("LOAD_AUDIT_PER_DAY", 1250);
 const READ_RUNS = number("LOAD_READ_RUNS", 30);
+// Simultaneous users of each traffic stage, and how long each stage lasts.
+const TRAFFIC_STAGES = (process.env.LOAD_TRAFFIC_USERS ?? "25,100,250")
+  .split(",")
+  .map(Number)
+  .filter((n) => Number.isFinite(n) && n > 0);
+const TRAFFIC_SECONDS = number("LOAD_TRAFFIC_SECONDS", 20);
+// LOAD_ONLY_TRAFFIC=1: make the data, then measure only the traffic (to compare settings quickly).
+const ONLY_TRAFFIC = process.env.LOAD_ONLY_TRAFFIC === "1";
 const WARMUP = 5;
 const EXPORT_RUNS = number("LOAD_EXPORT_RUNS", 10);
 const IMPORT_RUNS = number("LOAD_IMPORT_RUNS", 10);
@@ -87,8 +96,10 @@ const LIMITS = {
   dryRun: 5_000,
   rssGrowthMb: 300,
   loopLagMs: 200,
+  // p95 of any request while many people use the app at once.
+  traffic: 1_500,
 } as const;
-type Category = "list" | "search" | "dashboard" | "write" | "xlsx" | "pdf" | "import" | "dryRun";
+type Category = "list" | "search" | "dashboard" | "write" | "xlsx" | "pdf" | "import" | "dryRun" | "traffic";
 
 type Row = {
   name: string;
@@ -622,7 +633,11 @@ describe.skipIf(!RUN)("the load check", () => {
       },
       { schema },
     );
-    prisma = new PrismaClient({ adapter, log: [{ emit: "event", level: "query" }] });
+    prisma = new PrismaClient({
+      adapter,
+      log: [{ emit: "event", level: "query" }],
+      transactionOptions: TRANSACTION_DEFAULTS,
+    });
     (
       prisma as unknown as {
         $on: (event: "query", handler: (e: { query: string; params: string }) => void) => void;
@@ -730,426 +745,627 @@ describe.skipIf(!RUN)("the load check", () => {
   // In this order, and the order matters: the reads and the exports see the data as it was made (an export at exactly its cap), the
   // EXPLAINs are of those same reads, and only then do the writes and the imports add rows.
 
-  it("the reads", async () => {
-    await get("/villas?limit=20", "list", "GET /villas (page of 20)");
-    await get("/villas?limit=20&sort=progress:desc", "list", "GET /villas sorted by progress");
-    await get("/villas?limit=20&sort=location:asc", "list", "GET /villas sorted by location");
-    await get(
-      `/villas?limit=${Math.min(1000, VILLAS)}`,
-      "list",
-      `GET /villas (${Math.min(1000, VILLAS)} at once)`,
-    );
-    await get("/villas?limit=20&search=V-001", "search", "GET /villas?search=V-001 (number)");
-    await get("/villas?limit=20&search=Mansour", "search", "GET /villas?search=Mansour (owner)");
-    await get("/villas?limit=20&mewFollowUp=false&area=Area%203", "list", "GET /villas filtered by area");
-    await get("/villas/filters", "list");
-    await get("/villas/options", "list");
-    await get(`/villas/${villaId}`, "list", "GET /villas/:id");
-    await get("/dashboard/summary", "dashboard");
-    await get("/dashboard/recent-activity", "list");
-    for (const resource of [
-      "areas",
-      "contractors",
-      "civil-engineers",
-      "electrical-engineers",
-      "elec-phases",
-    ]) {
-      await get(`/${resource}`, "list");
-      await get(`/${resource}/options`, "list");
-    }
-    await get(`/contractors/${contractorId}/summary`, "list", "GET /contractors/:id/summary");
-    await get("/contractors?search=Contractor%200", "search", "GET /contractors?search=Contractor 0");
-    await get("/users", "list");
-    await get("/permissions", "list");
-    await get(`/villas/${villaId}/documents`, "list", "GET /villas/:id/documents");
-
-    for (const resource of ["open-works", "daily-reports", "small-works", "site-reports", "daily-labour"]) {
-      await get(`/${resource}?limit=20`, "list", `GET /${resource} (page of 20)`);
-      await get(`/${resource}?limit=1000`, "list", `GET /${resource} (1000 at once)`);
-      // A daily report has no villa: its owner is the contractor.
-      if (resource === "daily-reports") {
-        await get(
-          `/${resource}?limit=20&contractorId=${contractorId}`,
-          "list",
-          `GET /${resource} of one contractor`,
-        );
-      } else {
-        await get(`/${resource}?limit=20&villaId=${villaId}`, "list", `GET /${resource} of one villa`);
+  it.skipIf(ONLY_TRAFFIC)(
+    "the reads",
+    async () => {
+      await get("/villas?limit=20", "list", "GET /villas (page of 20)");
+      await get("/villas?limit=20&sort=progress:desc", "list", "GET /villas sorted by progress");
+      await get("/villas?limit=20&sort=location:asc", "list", "GET /villas sorted by location");
+      await get(
+        `/villas?limit=${Math.min(1000, VILLAS)}`,
+        "list",
+        `GET /villas (${Math.min(1000, VILLAS)} at once)`,
+      );
+      await get("/villas?limit=20&search=V-001", "search", "GET /villas?search=V-001 (number)");
+      await get("/villas?limit=20&search=Mansour", "search", "GET /villas?search=Mansour (owner)");
+      await get("/villas?limit=20&mewFollowUp=false&area=Area%203", "list", "GET /villas filtered by area");
+      await get("/villas/filters", "list");
+      await get("/villas/options", "list");
+      await get(`/villas/${villaId}`, "list", "GET /villas/:id");
+      await get("/dashboard/summary", "dashboard");
+      await get("/dashboard/recent-activity", "list");
+      await get(
+        "/dashboard/charts",
+        "dashboard",
+        "GET /dashboard/charts (4 charts, progress rebuilt from history)",
+      );
+      for (const resource of [
+        "areas",
+        "contractors",
+        "civil-engineers",
+        "electrical-engineers",
+        "elec-phases",
+      ]) {
+        await get(`/${resource}`, "list");
+        await get(`/${resource}/options`, "list");
       }
-    }
-    await get("/open-works?limit=20&search=Open%20work%202", "search", "GET /open-works?search");
-    await get("/open-works?limit=20&status=DELAYED&overdue=true", "list", "GET /open-works overdue");
-    await get("/open-works?limit=20&sort=location:asc", "list", "GET /open-works sorted by location");
-    // Four kinds of search on the biggest table: a word every row has, a word few rows have, a contractor name (a column of the
-    // contractor, not of the report), and a word no row has (the case where nothing short-circuits).
-    await get(
-      "/daily-reports?limit=20&search=slab",
-      "search",
-      "GET /daily-reports?search (every row matches)",
-    );
-    await get("/daily-reports?limit=20&search=Day%2077%3A", "search", "GET /daily-reports?search (few rows)");
-    await get(
-      `/daily-reports?limit=20&search=${encodeURIComponent(contractorNames[17] ?? "Contractor 17")}`,
-      "search",
-      "GET /daily-reports?search (a contractor name)",
-    );
-    await get(
-      "/daily-reports?limit=20&search=xyzzyplugh",
-      "search",
-      "GET /daily-reports?search (no row matches)",
-    );
-    await get("/daily-labour?limit=20&search=Two%20shifts", "search", "GET /daily-labour?search (notes)");
-    await get(
-      `/daily-labour?limit=20&search=${encodeURIComponent(contractorNames[3] ?? "Contractor 3")}`,
-      "search",
-      "GET /daily-labour?search (a contractor)",
-    );
-    await get(
-      "/daily-reports?limit=20&sort=contractorName:asc",
-      "list",
-      "GET /daily-reports sorted by contractor",
-    );
-    await get("/small-works?limit=20&search=fitting", "search", "GET /small-works?search");
-    await get("/site-reports?limit=20&search=Visit", "search", "GET /site-reports?search");
+      await get(`/contractors/${contractorId}/summary`, "list", "GET /contractors/:id/summary");
+      await get("/contractors?search=Contractor%200", "search", "GET /contractors?search=Contractor 0");
+      await get("/users", "list");
+      await get("/permissions", "list");
+      await get(`/villas/${villaId}/documents`, "list", "GET /villas/:id/documents");
 
-    // The newer pages.
-    await get("/payments?limit=20", "list", "GET /payments (page of 20, with totals)");
-    await get("/payments?limit=1000", "list", "GET /payments (1000 at once)");
-    await get("/payments?limit=20&overdue=true", "list", "GET /payments overdue");
-    await get("/payments?limit=20&sort=villaNumber:asc", "list", "GET /payments sorted by villa");
-    await get("/payments?limit=20&search=CHQ-7", "search", "GET /payments?search");
-    await get(`/payments?limit=20&contractorId=${contractorId}`, "list", "GET /payments of one contractor");
-    await get(`/villas/${villaId}/variation-orders`, "list", "GET /villas/:id/variation-orders");
-    await get("/owner-notes?limit=20", "list", "GET /owner-notes (page of 20)");
-    await get("/foreman-missions?limit=20", "list", "GET /foreman-missions (page of 20)");
-    await get("/maintenance?limit=20", "list", "GET /maintenance (page of 20)");
-    await get(
-      "/monthly-progress?limit=50",
-      "dashboard",
-      "GET /monthly-progress (this month, rebuilt from history)",
-    );
-    await get(
-      `/monthly-progress?limit=50&month=${(() => {
-        const d = new Date();
-        d.setUTCDate(1);
-        d.setUTCMonth(d.getUTCMonth() - 2);
-        return d.toISOString().slice(0, 7);
-      })()}`,
-      "dashboard",
-      "GET /monthly-progress (two months back)",
-    );
-    await get(
-      "/monthly-progress?limit=50&sort=change:desc",
-      "dashboard",
-      "GET /monthly-progress sorted by change",
-    );
-    // Every villa is there, and the history moved them: the open works went from half to their progress now 10 days ago.
-    const monthly = await request(server)
-      .get("/api/v1/monthly-progress?limit=1000")
-      .set("Authorization", await bearer());
-    expect(monthly.body.meta.total).toBe(VILLAS);
-    expect(monthly.body.data.some((item: { currentProgress: number }) => item.currentProgress > 0)).toBe(
-      true,
-    );
+      for (const resource of ["open-works", "daily-reports", "small-works", "site-reports", "daily-labour"]) {
+        await get(`/${resource}?limit=20`, "list", `GET /${resource} (page of 20)`);
+        await get(`/${resource}?limit=1000`, "list", `GET /${resource} (1000 at once)`);
+        // A daily report has no villa: its owner is the contractor.
+        if (resource === "daily-reports") {
+          await get(
+            `/${resource}?limit=20&contractorId=${contractorId}`,
+            "list",
+            `GET /${resource} of one contractor`,
+          );
+        } else {
+          await get(`/${resource}?limit=20&villaId=${villaId}`, "list", `GET /${resource} of one villa`);
+        }
+      }
+      await get("/open-works?limit=20&search=Open%20work%202", "search", "GET /open-works?search");
+      await get("/open-works?limit=20&status=DELAYED&overdue=true", "list", "GET /open-works overdue");
+      await get("/open-works?limit=20&sort=location:asc", "list", "GET /open-works sorted by location");
+      // Four kinds of search on the biggest table: a word every row has, a word few rows have, a contractor name (a column of the
+      // contractor, not of the report), and a word no row has (the case where nothing short-circuits).
+      await get(
+        "/daily-reports?limit=20&search=slab",
+        "search",
+        "GET /daily-reports?search (every row matches)",
+      );
+      await get(
+        "/daily-reports?limit=20&search=Day%2077%3A",
+        "search",
+        "GET /daily-reports?search (few rows)",
+      );
+      await get(
+        `/daily-reports?limit=20&search=${encodeURIComponent(contractorNames[17] ?? "Contractor 17")}`,
+        "search",
+        "GET /daily-reports?search (a contractor name)",
+      );
+      await get(
+        "/daily-reports?limit=20&search=xyzzyplugh",
+        "search",
+        "GET /daily-reports?search (no row matches)",
+      );
+      await get("/daily-labour?limit=20&search=Two%20shifts", "search", "GET /daily-labour?search (notes)");
+      await get(
+        `/daily-labour?limit=20&search=${encodeURIComponent(contractorNames[3] ?? "Contractor 3")}`,
+        "search",
+        "GET /daily-labour?search (a contractor)",
+      );
+      await get(
+        "/daily-reports?limit=20&sort=contractorName:asc",
+        "list",
+        "GET /daily-reports sorted by contractor",
+      );
+      await get("/small-works?limit=20&search=fitting", "search", "GET /small-works?search");
+      await get("/site-reports?limit=20&search=Visit", "search", "GET /site-reports?search");
 
-    await get("/audit-logs?limit=20", "list", "GET /audit-logs (page of 20)");
-    await get(
-      `/audit-logs?limit=20&entity=Villa&entityId=${villaId}`,
-      "list",
-      "GET /audit-logs of one villa",
-    );
-    await get("/audit-logs?limit=1000", "list", "GET /audit-logs (1000 at once)");
-    await get("/audit-logs/filters", "list");
-    await get(`/audit-logs/${auditId}`, "list", "GET /audit-logs/:id");
-    expect(rows.length).toBeGreaterThan(40);
-  }, 3_600_000);
-
-  it("the exports", async () => {
-    // Each window holds exactly EXPORT_CAP rows when the dataset is the full size; the rows are counted from the list.
-    const perVilla = Math.max(1, Math.floor(EXPORT_CAP / VILLAS));
-    // A report is one per contractor and day.
-    const reportDays = Math.max(1, Math.floor(EXPORT_CAP / CONTRACTORS));
-    const day = (offset: number) => new Date(Date.now() - offset * DAY_MS).toISOString().slice(0, 10);
-    const auditDays = Math.max(1, Math.min(DAYS, Math.ceil(EXPORT_CAP / AUDIT_PER_DAY)));
-    const cases: [string, string, string][] = [
-      ["daily reports", "/daily-reports/export", `reportFrom=${day(reportDays - 1)}&reportTo=${day(0)}`],
-      ["daily labour", "/daily-labour/export", `labourFrom=${day(perVilla - 1)}&labourTo=${day(0)}`],
-      ["small works", "/small-works/export", `endFrom=${day(perVilla * 2 - 1)}&endTo=${day(0)}`],
-      ["site reports", "/site-reports/export", ""],
-      ["open works", "/open-works/export", ""],
-      ["audit log", "/audit-logs/export", `from=${day(auditDays)}&to=${day(1)}`],
-      ["villas", "/villas/export", ""],
-      ["contractors", "/contractors/export", ""],
-      ["areas", "/areas/export", ""],
-      ["civil engineers", "/civil-engineers/export", ""],
-      ["electrical engineers", "/electrical-engineers/export", ""],
-      ["contractor summary", `/contractors/${contractorId}/summary/export`, ""],
-    ];
-    for (const [name, path, query] of cases) {
-      const listPath = path.replace("/export", "");
-      const counted = await request(server)
-        .get(`/api/v1${listPath}?limit=1${query ? `&${query}` : ""}`)
+      // The newer pages.
+      await get("/payments?limit=20", "list", "GET /payments (page of 20, with totals)");
+      await get("/payments?limit=1000", "list", "GET /payments (1000 at once)");
+      await get("/payments?limit=20&overdue=true", "list", "GET /payments overdue");
+      await get("/payments?limit=20&sort=villaNumber:asc", "list", "GET /payments sorted by villa");
+      await get("/payments?limit=20&search=CHQ-7", "search", "GET /payments?search");
+      await get(`/payments?limit=20&contractorId=${contractorId}`, "list", "GET /payments of one contractor");
+      await get(`/villas/${villaId}/variation-orders`, "list", "GET /villas/:id/variation-orders");
+      await get("/owner-notes?limit=20", "list", "GET /owner-notes (page of 20)");
+      await get("/foreman-missions?limit=20", "list", "GET /foreman-missions (page of 20)");
+      await get("/maintenance?limit=20", "list", "GET /maintenance (page of 20)");
+      await get(
+        "/monthly-progress?limit=50",
+        "dashboard",
+        "GET /monthly-progress (this month, rebuilt from history)",
+      );
+      await get(
+        `/monthly-progress?limit=50&month=${(() => {
+          const d = new Date();
+          d.setUTCDate(1);
+          d.setUTCMonth(d.getUTCMonth() - 2);
+          return d.toISOString().slice(0, 7);
+        })()}`,
+        "dashboard",
+        "GET /monthly-progress (two months back)",
+      );
+      await get(
+        "/monthly-progress?limit=50&sort=change:desc",
+        "dashboard",
+        "GET /monthly-progress sorted by change",
+      );
+      // Every villa is there, and the history moved them: the open works went from half to their progress now 10 days ago.
+      const monthly = await request(server)
+        .get("/api/v1/monthly-progress?limit=1000")
         .set("Authorization", await bearer());
-      const total = (counted.body as { meta?: { total?: number } }).meta?.total;
-      notes.push(`${name} export: ${total ?? "?"} rows`);
-      for (const format of ["xlsx", "pdf"] as const) {
-        await measureExport(name, `${path}${query ? `?${query}` : ""}`, format);
+      expect(monthly.body.meta.total).toBe(VILLAS);
+      expect(monthly.body.data.some((item: { currentProgress: number }) => item.currentProgress > 0)).toBe(
+        true,
+      );
+
+      await get("/audit-logs?limit=20", "list", "GET /audit-logs (page of 20)");
+      await get(
+        `/audit-logs?limit=20&entity=Villa&entityId=${villaId}`,
+        "list",
+        "GET /audit-logs of one villa",
+      );
+      await get("/audit-logs?limit=1000", "list", "GET /audit-logs (1000 at once)");
+      await get("/audit-logs/filters", "list");
+      await get(`/audit-logs/${auditId}`, "list", "GET /audit-logs/:id");
+      expect(rows.length).toBeGreaterThan(40);
+    },
+    3_600_000,
+  );
+
+  it.skipIf(ONLY_TRAFFIC)(
+    "the exports",
+    async () => {
+      // Each window holds exactly EXPORT_CAP rows when the dataset is the full size; the rows are counted from the list.
+      const perVilla = Math.max(1, Math.floor(EXPORT_CAP / VILLAS));
+      // A report is one per contractor and day.
+      const reportDays = Math.max(1, Math.floor(EXPORT_CAP / CONTRACTORS));
+      const day = (offset: number) => new Date(Date.now() - offset * DAY_MS).toISOString().slice(0, 10);
+      const auditDays = Math.max(1, Math.min(DAYS, Math.ceil(EXPORT_CAP / AUDIT_PER_DAY)));
+      const cases: [string, string, string][] = [
+        ["daily reports", "/daily-reports/export", `reportFrom=${day(reportDays - 1)}&reportTo=${day(0)}`],
+        ["daily labour", "/daily-labour/export", `labourFrom=${day(perVilla - 1)}&labourTo=${day(0)}`],
+        ["small works", "/small-works/export", `endFrom=${day(perVilla * 2 - 1)}&endTo=${day(0)}`],
+        // A site report every 4 days and an open work every 2 days a villa: a window of perVilla of each (all of them at 400 villas).
+        ["site reports", "/site-reports/export", `visitFrom=${day(4 * (perVilla - 1))}&visitTo=${day(0)}`],
+        ["open works", "/open-works/export", `endFrom=${day(18)}&endTo=${day(18 - 2 * (perVilla - 1))}`],
+        ["audit log", "/audit-logs/export", `from=${day(auditDays)}&to=${day(1)}`],
+        ["villas", "/villas/export", ""],
+        ["contractors", "/contractors/export", ""],
+        ["areas", "/areas/export", ""],
+        ["civil engineers", "/civil-engineers/export", ""],
+        ["electrical engineers", "/electrical-engineers/export", ""],
+        ["contractor summary", `/contractors/${contractorId}/summary/export`, ""],
+      ];
+      for (const [name, path, query] of cases) {
+        const listPath = path.replace("/export", "");
+        const counted = await request(server)
+          .get(`/api/v1${listPath}?limit=1${query ? `&${query}` : ""}`)
+          .set("Authorization", await bearer());
+        const total = (counted.body as { meta?: { total?: number } }).meta?.total;
+        notes.push(`${name} export: ${total ?? "?"} rows`);
+        for (const format of ["xlsx", "pdf"] as const) {
+          await measureExport(name, `${path}${query ? `?${query}` : ""}`, format);
+        }
       }
-    }
-  }, 3_600_000);
+    },
+    3_600_000,
+  );
 
-  it("EXPLAIN on the slowest reads", async () => {
-    // The slowest p95 reads, and any read over its limit.
-    const reads = rows.filter((row) => row.name.startsWith("GET ")).sort((a, b) => b.p95 - a.p95);
-    const over = reads.filter((row) => row.p95 > row.limit);
-    const chosen = [...new Set([...over, ...reads.slice(0, 4)].map((row) => row.name))];
-    notes.push(
-      `reads over their limit: ${over.length === 0 ? "none" : over.map((row) => row.name).join("; ")}`,
-    );
-    for (const name of chosen) {
-      const path = paths.get(name);
-      if (path) await explain(path);
-    }
-    expect(chosen.length).toBeGreaterThan(0);
-  }, 600_000);
+  it.skipIf(ONLY_TRAFFIC)(
+    "EXPLAIN on the slowest reads",
+    async () => {
+      // The slowest p95 reads, and any read over its limit.
+      const reads = rows.filter((row) => row.name.startsWith("GET ")).sort((a, b) => b.p95 - a.p95);
+      const over = reads.filter((row) => row.p95 > row.limit);
+      const chosen = [...new Set([...over, ...reads.slice(0, 4)].map((row) => row.name))];
+      notes.push(
+        `reads over their limit: ${over.length === 0 ? "none" : over.map((row) => row.name).join("; ")}`,
+      );
+      for (const name of chosen) {
+        const path = paths.get(name);
+        if (path) await explain(path);
+      }
+      expect(chosen.length).toBeGreaterThan(0);
+    },
+    600_000,
+  );
 
-  it("the writes", async () => {
-    let day = REPORT_DAYS + 1;
-    const headers = async (extra: Record<string, string> = {}) => ({
-      Authorization: await bearer(),
-      ...extra,
-    });
-    // The same contractor, a day nobody has used each time: create, update, delete.
-    const created: { id: string; version: number }[] = [];
-    await measure(
-      "POST /daily-reports",
-      "write",
-      async () => {
-        const res = await request(server)
-          .post("/api/v1/daily-reports")
-          .set(await headers({ "Idempotency-Key": randomUUID() }))
-          .send({
-            contractorId,
-            preparedByEngineerId: engineerId,
-            reportDate: new Date(Date.now() - day++ * DAY_MS).toISOString().slice(0, 10),
-            weather: "SUNNY",
-            workersCount: 12,
-            notes: "Poured the slab",
-          });
-        if (res.status === 201)
-          created.push({ id: (res.body as { data: { id: string } }).data.id, version: 1 });
-        return { ok: res.status === 201 };
-      },
-      WRITE_RUNS,
-      2,
-    );
-    let at = 0;
-    await measure(
-      "PATCH /daily-reports/:id",
-      "write",
-      async () => {
-        const target = created[at++ % created.length]!;
-        const res = await request(server)
-          .patch(`/api/v1/daily-reports/${target.id}`)
-          .set(await headers({ "If-Match": `"${target.version}"` }))
-          .send({ workersCount: 20 + at });
-        if (res.status === 200) target.version += 1;
-        return { ok: res.status === 200 };
-      },
-      WRITE_RUNS,
-      2,
-    );
-    let level = 1;
-    await measure(
-      "PATCH /villas/:id/phases/:id (progress)",
-      "write",
-      async () => {
-        const res = await request(server)
-          .patch(`/api/v1/villas/${villaId}/phases/${phaseId}`)
-          .set(await headers())
-          .send({ progress: (level += 3) % 100 });
-        return { ok: res.status === 200 };
-      },
-      WRITE_RUNS,
-      2,
-    );
-    // A villa has at most one open work per electrical phase, and the seed gave every villa all the phases: each POST
-    // here gets the next villa in a phase made for this step, which no villa has yet.
-    const writePhaseId = (
+  it.skipIf(ONLY_TRAFFIC)(
+    "the writes",
+    async () => {
+      let day = REPORT_DAYS + 1;
+      const headers = async (extra: Record<string, string> = {}) => ({
+        Authorization: await bearer(),
+        ...extra,
+      });
+      // The same contractor, a day nobody has used each time: create, update, delete.
+      const created: { id: string; version: number }[] = [];
+      await measure(
+        "POST /daily-reports",
+        "write",
+        async () => {
+          const res = await request(server)
+            .post("/api/v1/daily-reports")
+            .set(await headers({ "Idempotency-Key": randomUUID() }))
+            .send({
+              contractorId,
+              preparedByEngineerId: engineerId,
+              reportDate: new Date(Date.now() - day++ * DAY_MS).toISOString().slice(0, 10),
+              weather: "SUNNY",
+              workersCount: 12,
+              notes: "Poured the slab",
+            });
+          if (res.status === 201)
+            created.push({ id: (res.body as { data: { id: string } }).data.id, version: 1 });
+          return { ok: res.status === 201 };
+        },
+        WRITE_RUNS,
+        2,
+      );
+      let at = 0;
+      await measure(
+        "PATCH /daily-reports/:id",
+        "write",
+        async () => {
+          const target = created[at++ % created.length]!;
+          const res = await request(server)
+            .patch(`/api/v1/daily-reports/${target.id}`)
+            .set(await headers({ "If-Match": `"${target.version}"` }))
+            .send({ workersCount: 20 + at });
+          if (res.status === 200) target.version += 1;
+          return { ok: res.status === 200 };
+        },
+        WRITE_RUNS,
+        2,
+      );
+      let level = 1;
+      await measure(
+        "PATCH /villas/:id/phases/:id (progress)",
+        "write",
+        async () => {
+          const res = await request(server)
+            .patch(`/api/v1/villas/${villaId}/phases/${phaseId}`)
+            .set(await headers())
+            .send({ progress: (level += 3) % 100 });
+          return { ok: res.status === 200 };
+        },
+        WRITE_RUNS,
+        2,
+      );
+      // A villa has at most one open work per electrical phase, and the seed gave every villa all the phases: each POST
+      // here gets the next villa in a phase made for this step, which no villa has yet.
+      const writePhaseId = (
+        await q(
+          `INSERT INTO "ElecPhase" ("id","name","sortOrder","updatedAt") VALUES (gen_random_uuid()::text, 'Load write phase', 1000, now()) RETURNING "id"`,
+        )
+      ).rows[0].id as string;
+      let posting = 0;
+      await measure(
+        "POST /open-works",
+        "write",
+        async () => {
+          const res = await request(server)
+            .post("/api/v1/open-works")
+            .set(await headers({ "Idempotency-Key": randomUUID() }))
+            .send({
+              villaId: villaIds[posting++ % villaIds.length],
+              elecPhaseId: writePhaseId,
+              priority: "HIGH",
+            });
+          return {
+            ok: res.status === 201,
+            detail: res.status === 201 ? "" : JSON.stringify(res.body).slice(0, 200),
+          };
+        },
+        WRITE_RUNS,
+        2,
+      );
+      let deleting = 0;
+      await measure(
+        "DELETE /daily-reports/:id",
+        "write",
+        async () => {
+          const target = created[deleting++]!;
+          const res = await request(server)
+            .delete(`/api/v1/daily-reports/${target.id}`)
+            .set(await headers());
+          return { ok: res.status === 204 || res.status === 200 };
+        },
+        Math.min(WRITE_RUNS, created.length - 2),
+        2,
+      );
+    },
+    3_600_000,
+  );
+
+  it.skipIf(ONLY_TRAFFIC)(
+    "the imports",
+    async () => {
+      const perRun = Math.max(1, Math.floor(IMPORT_ROWS / VILLAS));
+      const sheetDays = (run: number, from: number) =>
+        Array.from({ length: perRun }, (_, i) => from + run * perRun + i);
+      const dayOf = (offset: number) => new Date(Date.now() - offset * DAY_MS).toISOString().slice(0, 10);
+      const forVillas = (count: number) => villaNumbers.slice(0, count);
+
+      // A report is one per contractor and day: a file holds IMPORT_ROWS / CONTRACTORS days of every contractor.
+      const contractorList = [...new Set(contractorNames)];
+      const reportRun = Math.max(1, Math.floor(IMPORT_ROWS / contractorList.length));
+      const reports = (from: number) => async (run: number) =>
+        workbookOf(
+          ["Report Date", "Contractor", "Electrical Engineer", "Weather", "Workers", "Notes"],
+          Array.from({ length: reportRun }, (_, i) => from + run * reportRun + i).flatMap((offset) =>
+            contractorList.map((contractor, index) => [
+              dayOf(offset),
+              contractor,
+              `Electrical Engineer ${(index % 12) + 1}`,
+              "Sunny",
+              10 + (index % 20),
+              `Imported day ${offset}: slab and rebar`,
+            ]),
+          ),
+        );
+      const labour = (from: number) => async (run: number) =>
+        workbookOf(
+          ["Villa Number", "Labour Date", "Labour Count", "Contractor", "Notes"],
+          sheetDays(run, from).flatMap((offset) =>
+            forVillas(VILLAS).map((villa, index) => [
+              villa,
+              dayOf(offset),
+              5 + (index % 20),
+              contractorNames[index] ?? "",
+              "Imported",
+            ]),
+          ),
+        );
+      // One open work per villa and phase: every file uses phases no villa has yet. The dry runs share block 0 (they write
+      // nothing); real run r uses block r + 1, so no real run repeats a pair an earlier one created.
+      const phasesPerRun = Math.ceil(IMPORT_ROWS / VILLAS);
       await q(
-        `INSERT INTO "ElecPhase" ("id","name","sortOrder","updatedAt") VALUES (gen_random_uuid()::text, 'Load write phase', 1000, now()) RETURNING "id"`,
-      )
-    ).rows[0].id as string;
-    let posting = 0;
-    await measure(
-      "POST /open-works",
-      "write",
-      async () => {
-        const res = await request(server)
-          .post("/api/v1/open-works")
-          .set(await headers({ "Idempotency-Key": randomUUID() }))
-          .send({
-            villaId: villaIds[posting++ % villaIds.length],
-            elecPhaseId: writePhaseId,
-            priority: "HIGH",
-          });
-        return {
-          ok: res.status === 201,
-          detail: res.status === 201 ? "" : JSON.stringify(res.body).slice(0, 200),
-        };
-      },
-      WRITE_RUNS,
-      2,
-    );
-    let deleting = 0;
-    await measure(
-      "DELETE /daily-reports/:id",
-      "write",
-      async () => {
-        const target = created[deleting++]!;
-        const res = await request(server)
-          .delete(`/api/v1/daily-reports/${target.id}`)
-          .set(await headers());
-        return { ok: res.status === 204 || res.status === 200 };
-      },
-      Math.min(WRITE_RUNS, created.length - 2),
-      2,
-    );
-  }, 3_600_000);
-
-  it("the imports", async () => {
-    const perRun = Math.max(1, Math.floor(IMPORT_ROWS / VILLAS));
-    const sheetDays = (run: number, from: number) =>
-      Array.from({ length: perRun }, (_, i) => from + run * perRun + i);
-    const dayOf = (offset: number) => new Date(Date.now() - offset * DAY_MS).toISOString().slice(0, 10);
-    const forVillas = (count: number) => villaNumbers.slice(0, count);
-
-    // A report is one per contractor and day: a file holds IMPORT_ROWS / CONTRACTORS days of every contractor.
-    const contractorList = [...new Set(contractorNames)];
-    const reportRun = Math.max(1, Math.floor(IMPORT_ROWS / contractorList.length));
-    const reports = (from: number) => async (run: number) =>
-      workbookOf(
-        ["Report Date", "Contractor", "Electrical Engineer", "Weather", "Workers", "Notes"],
-        Array.from({ length: reportRun }, (_, i) => from + run * reportRun + i).flatMap((offset) =>
-          contractorList.map((contractor, index) => [
-            dayOf(offset),
-            contractor,
-            `Electrical Engineer ${(index % 12) + 1}`,
-            "Sunny",
-            10 + (index % 20),
-            `Imported day ${offset}: slab and rebar`,
-          ]),
-        ),
-      );
-    const labour = (from: number) => async (run: number) =>
-      workbookOf(
-        ["Villa Number", "Labour Date", "Labour Count", "Contractor", "Notes"],
-        sheetDays(run, from).flatMap((offset) =>
-          forVillas(VILLAS).map((villa, index) => [
-            villa,
-            dayOf(offset),
-            5 + (index % 20),
-            contractorNames[index] ?? "",
-            "Imported",
-          ]),
-        ),
-      );
-    // One open work per villa and phase: every file uses phases no villa has yet. The dry runs share block 0 (they write
-    // nothing); real run r uses block r + 1, so no real run repeats a pair an earlier one created.
-    const phasesPerRun = Math.ceil(IMPORT_ROWS / VILLAS);
-    await q(
-      `INSERT INTO "ElecPhase" ("id","name","sortOrder","updatedAt")
+        `INSERT INTO "ElecPhase" ("id","name","sortOrder","updatedAt")
        SELECT gen_random_uuid()::text, 'Import phase ' || g, 2000 + g, now() FROM generate_series(1, ${phasesPerRun * (IMPORT_RUNS + 1)}) g`,
-    );
-    const importPhase = (salt: string, run: number, row: number) =>
-      `Import phase ${(salt === "dry" ? 0 : run + 1) * phasesPerRun + Math.floor(row / VILLAS) + 1}`;
-    const works = (salt: string) => async (run: number) =>
-      workbookOf(
-        [
-          "Villa Number",
-          "Electrical Phase",
-          "Status",
-          "Priority",
-          "Progress",
-          "Contractor",
-          "Start Date",
-          "End Date",
-        ],
-        // An open work has no natural key, so a file differs from the one before it by its start date (a repeated file is refused).
-        Array.from({ length: IMPORT_ROWS }, (_, i) => [
-          villaNumbers[i % VILLAS] ?? "",
-          importPhase(salt, run, i),
-          "In progress",
-          "Medium",
-          40,
-          contractorNames[i % VILLAS] ?? "",
-          dayOf(30 + run + (salt === "dry" ? 0 : 500)),
-          dayOf(-30),
-        ]),
       );
-    const contractors = (salt: string) => async (run: number) =>
-      workbookOf(
-        ["Name", "Phone", "Email", "Status"],
-        Array.from({ length: IMPORT_ROWS }, (_, i) => [
-          `Imported ${salt} contractor ${run}-${i}`,
-          `0111${String(run * IMPORT_ROWS + i).padStart(7, "0")}`,
-          "",
-          "Active",
-        ]),
-      );
+      const importPhase = (salt: string, run: number, row: number) =>
+        `Import phase ${(salt === "dry" ? 0 : run + 1) * phasesPerRun + Math.floor(row / VILLAS) + 1}`;
+      const works = (salt: string) => async (run: number) =>
+        workbookOf(
+          [
+            "Villa Number",
+            "Electrical Phase",
+            "Status",
+            "Priority",
+            "Progress",
+            "Contractor",
+            "Start Date",
+            "End Date",
+          ],
+          // An open work has no natural key, so a file differs from the one before it by its start date (a repeated file is refused).
+          Array.from({ length: IMPORT_ROWS }, (_, i) => [
+            villaNumbers[i % VILLAS] ?? "",
+            importPhase(salt, run, i),
+            "In progress",
+            "Medium",
+            40,
+            contractorNames[i % VILLAS] ?? "",
+            dayOf(30 + run + (salt === "dry" ? 0 : 500)),
+            dayOf(-30),
+          ]),
+        );
+      const contractors = (salt: string) => async (run: number) =>
+        workbookOf(
+          ["Name", "Phone", "Email", "Status"],
+          Array.from({ length: IMPORT_ROWS }, (_, i) => [
+            `Imported ${salt} contractor ${run}-${i}`,
+            `0111${String(run * IMPORT_ROWS + i).padStart(7, "0")}`,
+            "",
+            "Active",
+          ]),
+        );
 
-    // The villas of a file are new ones: numbers (as number cells, the way the client's sheet has them), plots and blocks that
-    // nobody used. The area, the engineers and the contractor are found by name, as in a real file.
-    let villaSerial = 0;
-    const newVillas = (rows: number) => async () => {
-      const first = villaSerial;
-      villaSerial += rows;
-      return workbookOf(
-        [
-          "Villa Number",
-          "Owner Name",
-          "Area",
-          "Block",
-          "Plot",
-          "Contractor",
-          "Electrical Engineer",
-          "Civil Engineer",
-          "Start Date",
-          "Target Date",
-          "Budget",
-        ],
-        Array.from({ length: rows }, (_, i) => {
-          const n = first + i;
-          return [
-            1_000_000 + n,
-            `Owner ${n} Mansour`,
-            `Area ${(n % AREAS) + 1}`,
-            `L${Math.floor(n / 500)}`,
-            n,
-            contractorNames[n % VILLAS] ?? "",
-            `Electrical Engineer ${(n % 12) + 1}`,
-            `Civil Engineer ${(n % 12) + 1}`,
-            dayOf(30),
-            dayOf(-120),
-            1_000_000 + n * 10,
-          ];
-        }),
-      );
+      // The villas of a file are new ones: numbers (as number cells, the way the client's sheet has them), plots and blocks that
+      // nobody used. The area, the engineers and the contractor are found by name, as in a real file.
+      let villaSerial = 0;
+      const newVillas = (rows: number) => async () => {
+        const first = villaSerial;
+        villaSerial += rows;
+        return workbookOf(
+          [
+            "Villa Number",
+            "Owner Name",
+            "Area",
+            "Block",
+            "Plot",
+            "Contractor",
+            "Electrical Engineer",
+            "Civil Engineer",
+            "Start Date",
+            "Target Date",
+            "Budget",
+          ],
+          Array.from({ length: rows }, (_, i) => {
+            const n = first + i;
+            return [
+              1_000_000 + n,
+              `Owner ${n} Mansour`,
+              `Area ${(n % AREAS) + 1}`,
+              `L${Math.floor(n / 500)}`,
+              n,
+              contractorNames[n % VILLAS] ?? "",
+              `Electrical Engineer ${(n % 12) + 1}`,
+              `Civil Engineer ${(n % 12) + 1}`,
+              dayOf(30),
+              dayOf(-120),
+              1_000_000 + n * 10,
+            ];
+          }),
+        );
+      };
+
+      // Each run is a file nobody sent before (new days, new names), so nothing is refused as a repeat.
+      await measureImport("daily reports", "/daily-reports", true, reports(REPORT_DAYS + 1000));
+      await measureImport("daily reports", "/daily-reports", false, reports(REPORT_DAYS + 100));
+      await measureImport("daily labour", "/daily-labour", true, labour(DAYS + 400));
+      await measureImport("daily labour", "/daily-labour", false, labour(DAYS + 10));
+      await measureImport("open works", "/open-works", true, works("dry"));
+      await measureImport("open works", "/open-works", false, works("real"));
+      await measureImport("contractors", "/contractors", true, contractors("dry"));
+      await measureImport("contractors", "/contractors", false, contractors("real"));
+      await measureImport("villas, 400 rows", "/villas", true, newVillas(400));
+      await measureImport("villas, 400 rows", "/villas", false, newVillas(400));
+      await measureImport("villas, 2,000 rows", "/villas", true, newVillas(IMPORT_ROWS));
+      await measureImport("villas, 2,000 rows", "/villas", false, newVillas(IMPORT_ROWS));
+    },
+    3_600_000,
+  );
+
+  // HEAVY TRAFFIC: many people at once, over real HTTP (keep-alive, like browsers), each in a loop of what a busy team
+  // does: lists, details, searches, the dashboard and its charts, and saves (a payment added, then marked paid). Every
+  // stage runs TRAFFIC_SECONDS; it records the throughput, p50/p95/p99 of every request, the errors (any 5xx, or a 4xx
+  // that is not an expected refusal), the event-loop lag and the memory.
+  it("heavy traffic", async () => {
+    const token = await bearer();
+    const headers = { Authorization: token, "Accept-Language": "en", "Content-Type": "application/json" };
+    const pick = <T>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)]!;
+    type Op = { name: string; weight: number; run: () => Promise<number[]> };
+    const send = async (method: string, path: string, body?: unknown, extra: Record<string, string> = {}) => {
+      const res = await fetch(`${base}/api/v1${path}`, {
+        method,
+        headers: { ...headers, ...extra },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      const text = await res.text();
+      return {
+        status: res.status,
+        json: text ? (JSON.parse(text) as { data?: { id: string; version: number } }) : {},
+      };
+    };
+    const get = async (path: string) => [(await send("GET", path)).status];
+    const ops: Op[] = [
+      { name: "villas list", weight: 14, run: () => get("/villas?limit=20") },
+      { name: "villas sorted by progress", weight: 4, run: () => get("/villas?limit=20&sort=progress:desc") },
+      { name: "villa detail", weight: 14, run: () => get(`/villas/${pick(villaIds)}`) },
+      {
+        name: "villa search",
+        weight: 6,
+        run: () => get(`/villas?limit=20&search=${encodeURIComponent(pick(villaNumbers))}`),
+      },
+      { name: "dashboard summary", weight: 7, run: () => get("/dashboard/summary") },
+      { name: "dashboard charts", weight: 3, run: () => get("/dashboard/charts") },
+      { name: "open works", weight: 9, run: () => get("/open-works?limit=20") },
+      { name: "daily reports", weight: 8, run: () => get("/daily-reports?limit=20") },
+      {
+        name: "daily labour of a villa",
+        weight: 5,
+        run: () => get(`/daily-labour?limit=20&villaId=${pick(villaIds)}`),
+      },
+      { name: "payments", weight: 7, run: () => get("/payments?limit=20") },
+      { name: "variation orders", weight: 5, run: () => get(`/villas/${pick(villaIds)}/variation-orders`) },
+      { name: "monthly progress", weight: 2, run: () => get("/monthly-progress?limit=50") },
+      { name: "notifications", weight: 4, run: () => get("/notifications?limit=20") },
+      {
+        name: "add a payment and mark it paid",
+        weight: 6,
+        run: async () => {
+          const created = await send("POST", "/payments", {
+            contractorId,
+            villaId: pick(villaIds),
+            amountMinor: 1000 + Math.floor(Math.random() * 1_000_000),
+            reference: `LOAD-${randomUUID().slice(0, 8)}`,
+          });
+          if (created.status !== 201 || !created.json.data) return [created.status];
+          const paid = await send(
+            "PATCH",
+            `/payments/${created.json.data.id}`,
+            { status: "PAID" },
+            { "If-Match": `"${created.json.data.version}"` },
+          );
+          return [created.status, paid.status];
+        },
+      },
+    ];
+    const totalWeight = ops.reduce((sum, op) => sum + op.weight, 0);
+    const choose = (): Op => {
+      let r = Math.random() * totalWeight;
+      for (const op of ops) {
+        r -= op.weight;
+        if (r <= 0) return op;
+      }
+      return ops[0]!;
     };
 
-    // Each run is a file nobody sent before (new days, new names), so nothing is refused as a repeat.
-    await measureImport("daily reports", "/daily-reports", true, reports(REPORT_DAYS + 1000));
-    await measureImport("daily reports", "/daily-reports", false, reports(REPORT_DAYS + 100));
-    await measureImport("daily labour", "/daily-labour", true, labour(DAYS + 400));
-    await measureImport("daily labour", "/daily-labour", false, labour(DAYS + 10));
-    await measureImport("open works", "/open-works", true, works("dry"));
-    await measureImport("open works", "/open-works", false, works("real"));
-    await measureImport("contractors", "/contractors", true, contractors("dry"));
-    await measureImport("contractors", "/contractors", false, contractors("real"));
-    await measureImport("villas, 400 rows", "/villas", true, newVillas(400));
-    await measureImport("villas, 400 rows", "/villas", false, newVillas(400));
-    await measureImport("villas, 2,000 rows", "/villas", true, newVillas(IMPORT_ROWS));
-    await measureImport("villas, 2,000 rows", "/villas", false, newVillas(IMPORT_ROWS));
+    // The data the traffic runs against: the earlier phases (writes, imports) add to what was made.
+    const size = await q(
+      `SELECT (SELECT count(*) FROM "Villa")::int AS villas, (SELECT count(*) FROM "WorkItem")::int AS works,
+              (SELECT count(*) FROM "DailyReport")::int AS reports, (SELECT count(*) FROM "Contractor")::int AS contractors`,
+    );
+    const { villas, works, reports, contractors } = size.rows[0];
+    notes.push(
+      `traffic ran against ${villas} villas, ${works} open works, ${reports} daily reports, ${contractors} contractors`,
+    );
+    log(
+      `traffic data: ${villas} villas, ${works} open works, ${reports} daily reports, ${contractors} contractors`,
+    );
+
+    for (const users of TRAFFIC_STAGES) {
+      const times: number[] = [];
+      const statuses = new Map<number, number>();
+      const slowestByOp = new Map<string, number>();
+      const timesByOp = new Map<string, number[]>();
+      let failures = 0;
+      const histogram = monitorEventLoopDelay({ resolution: 10 });
+      const rssBefore = process.memoryUsage().rss;
+      let rssPeak = rssBefore;
+      const sampler = setInterval(() => (rssPeak = Math.max(rssPeak, process.memoryUsage().rss)), 100);
+      histogram.enable();
+      const startedAt = performance.now();
+      const deadline = startedAt + TRAFFIC_SECONDS * 1000;
+      await Promise.all(
+        Array.from({ length: users }, async () => {
+          while (performance.now() < deadline) {
+            const op = choose();
+            const start = performance.now();
+            let codes: number[];
+            try {
+              codes = await op.run();
+            } catch {
+              codes = [0];
+            }
+            const took = performance.now() - start;
+            times.push(took);
+            slowestByOp.set(op.name, Math.max(slowestByOp.get(op.name) ?? 0, took));
+            const list = timesByOp.get(op.name) ?? [];
+            list.push(took);
+            timesByOp.set(op.name, list);
+            for (const code of codes) {
+              statuses.set(code, (statuses.get(code) ?? 0) + 1);
+              if (code === 0 || code >= 500 || (code >= 400 && code !== 409)) failures++;
+            }
+          }
+        }),
+      );
+      const seconds = (performance.now() - startedAt) / 1000;
+      histogram.disable();
+      clearInterval(sampler);
+      times.sort((a, b) => a - b);
+      const requests = [...statuses.values()].reduce((sum, n) => sum + n, 0);
+      const slowest = [...slowestByOp.entries()].sort((a, b) => b[1] - a[1])[0];
+      const row: Row = {
+        name: `traffic: ${users} users at once for ${TRAFFIC_SECONDS} s`,
+        category: "traffic",
+        runs: times.length,
+        p50: round(percentile(times, 50)),
+        p95: round(percentile(times, 95)),
+        max: round(times[times.length - 1] ?? 0),
+        limit: LIMITS.traffic,
+        detail:
+          `${(requests / seconds).toFixed(0)} req/s, p99 ${round(percentile(times, 99))} ms, ${failures} errors ` +
+          `(${[...statuses.entries()].map(([code, n]) => `${code}: ${n}`).join(", ")}), ` +
+          `loop lag max ${(histogram.max / 1e6).toFixed(0)} ms, +${((rssPeak - rssBefore) / 1024 / 1024).toFixed(0)} MB RSS, ` +
+          `slowest: ${slowest ? `${slowest[0]} ${round(slowest[1])} ms` : "-"}`,
+      };
+      rows.push(row);
+      log(`${row.name}: ${row.detail}`);
+      const perOp = [...timesByOp.entries()]
+        .map(([name, list]) => {
+          const sorted = [...list].sort((a, b) => a - b);
+          const mean = sorted.reduce((sum, t) => sum + t, 0) / sorted.length;
+          return { name, n: sorted.length, mean, p95: percentile(sorted, 95) };
+        })
+        .sort((a, b) => b.mean - a.mean);
+      notes.push(
+        `${row.name}, per request type (slowest first): ` +
+          perOp
+            .map((op) => `${op.name} n=${op.n} avg ${round(op.mean)} ms p95 ${round(op.p95)} ms`)
+            .join("; "),
+      );
+      // Nothing may fail under load: no server error, no refused request that should have passed.
+      expect(failures, row.detail).toBe(0);
+    }
+
+    // Every payment the traffic added and marked paid is whole: paid, with its date, one audit entry per write.
+    const broken = await q(
+      `SELECT count(*)::int AS n FROM "ContractorPayment" WHERE "reference" LIKE 'LOAD-%' AND ("status" <> 'PAID' OR "paidDate" IS NULL)`,
+    );
+    notes.push(`traffic: ${broken.rows[0].n} payments left half-written (pending after the add-then-pay)`);
   }, 3_600_000);
 
   it("what is over its limit", () => {

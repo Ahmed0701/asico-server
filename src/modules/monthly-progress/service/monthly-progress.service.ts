@@ -16,7 +16,7 @@ import {
 } from "../dto/monthly-progress.dto.js";
 import { MonthlyProgressRepository } from "../repository/monthly-progress.repository.js";
 import type { MonthlyProgressQuery } from "../validators/monthly-progress.validators.js";
-import { eventsByWork, villaProgressFromWorks, worksAt } from "./progress-history.js";
+import { ProgressHistory } from "./progress-history-cache.js";
 
 const DEFAULT_SORT: MonthlyProgressSort = { field: "villaNumber", direction: "asc" };
 
@@ -62,6 +62,7 @@ export class MonthlyProgressService {
   constructor(
     private readonly repository = new MonthlyProgressRepository(),
     private readonly clock: () => Date = () => new Date(),
+    private readonly history = new ProgressHistory(repository),
   ) {}
 
   async list(query: MonthlyProgressQuery, ctx: RequestContext): Promise<MonthlyProgressResult> {
@@ -77,15 +78,13 @@ export class MonthlyProgressService {
     const monthStart = startOfLocalDay(`${month}-01`, env.APP_TIMEZONE);
     const monthEnd = isCurrentMonth ? now : startOfLocalDay(`${shiftMonth(month, 1)}-01`, env.APP_TIMEZONE);
 
-    const [villas, phases, works, events] = await Promise.all([
+    // Past instants are rebuilt from the history (cached); now comes from the open works as they are.
+    const [villas, [start, pastEnd]] = await Promise.all([
       this.repository.villas(),
-      this.repository.activePhases(),
-      this.repository.works(),
-      this.repository.workEvents(),
+      this.history.at(isCurrentMonth ? [monthStart] : [monthStart, monthEnd]),
     ]);
-    const byWork = eventsByWork(events);
-    const previous = villaProgressFromWorks(worksAt(monthStart, works, byWork), phases);
-    const current = villaProgressFromWorks(worksAt(monthEnd, works, byWork), phases);
+    const previous = start ?? new Map<string, number>();
+    const current = isCurrentMonth ? await this.history.current() : (pastEnd ?? new Map<string, number>());
 
     const term = query.search?.toLocaleLowerCase();
     const all: MonthlyProgressItemDto[] = [];

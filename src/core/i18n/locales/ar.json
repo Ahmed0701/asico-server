@@ -7,6 +7,7 @@
   "errors.payloadTooLarge": "حجم الطلب كبير جدًا",
   "errors.tooManyRequests": "عدد الطلبات كبير جدًا",
   "errors.internal": "خطأ داخلي في الخادم",
+  "errors.serviceBusy": "الخادم مشغول. يرجى المحاولة مرة أخرى بعد لحظات",
   "errors.invalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
   "errors.accountInactive": "حسابك غير مفعّل بعد",
   "errors.signupDisabled": "التسجيل الذاتي متوقف. اطلب من المسؤول إنشاء حسابك.",
