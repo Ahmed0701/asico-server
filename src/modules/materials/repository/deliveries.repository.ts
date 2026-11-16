@@ -114,6 +114,9 @@ function whereOf(f: DeliveryFilters): Prisma.MaterialDeliveryWhereInput {
 }
 
 function orderByOf({ field, direction }: DeliverySort): Prisma.MaterialDeliveryOrderByWithRelationInput[] {
+  if (field === "villaNumber") {
+    return [{ villa: { villaNumber: direction } }, { deliveryDate: "desc" }, { id: "asc" }];
+  }
   return field === "createdAt"
     ? [{ createdAt: direction }, { id: "asc" }]
     : [{ deliveryDate: direction }, { createdAt: "desc" }, { id: "asc" }];

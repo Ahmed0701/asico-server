@@ -916,6 +916,30 @@ describe("GET /open-works", () => {
   });
 
   describe("sorting", () => {
+    it("sorts by villa number in natural order (V-2 before V-10), then the phase's own order", async () => {
+      const v10 = addVilla({ villaNumber: "V-10" });
+      const v2 = addVilla({ villaNumber: "V-2" });
+      await made({ villaId: v10.id, elecPhaseId: phases[0]!.id });
+      await made({ villaId: v2.id, elecPhaseId: phases[1]!.id });
+      await made({ villaId: v2.id, elecPhaseId: phases[0]!.id });
+      const rows = (res: request.Response) =>
+        res.body.data.map((i: { villa: { villaNumber: string }; elecPhase: { name: string } }) => [
+          i.villa.villaNumber,
+          i.elecPhase.name,
+        ]);
+
+      expect(rows(await list("?sort=villaNumber"))).toEqual([
+        ["V-2", phases[0]!.name],
+        ["V-2", phases[1]!.name],
+        ["V-10", phases[0]!.name],
+      ]);
+      expect(rows(await list("?sort=villaNumber:desc"))).toEqual([
+        ["V-10", phases[0]!.name],
+        ["V-2", phases[0]!.name],
+        ["V-2", phases[1]!.name],
+      ]);
+    });
+
     it("sorts the phase names in natural order, ascending and descending", async () => {
       for (const name of ["A10", "A2", "A9", "a1"]) await madeAs(name);
 

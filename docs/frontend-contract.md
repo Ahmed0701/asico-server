@@ -1171,7 +1171,7 @@ The work still to be done on a villa, **filed under one electrical phase**: a st
 
 <!-- list: OPEN_WORK_SORT_FIELDS -->
 
-`location`, `elecPhaseName`, `status`, `priority`, `progress`, `startDate`, `endDate`
+`location`, `villaNumber`, `elecPhaseName`, `status`, `priority`, `progress`, `startDate`, `endDate`
 
 **Create** `POST /open-works`, **change** `PATCH /open-works/:id` (at least one field)
 

@@ -113,7 +113,7 @@ export type MaterialsSummaryDto = {
   materials: MaterialTotalDto[];
 };
 
-export const DELIVERY_SORT_FIELDS = ["deliveryDate", "createdAt"] as const;
+export const DELIVERY_SORT_FIELDS = ["deliveryDate", "createdAt", "villaNumber"] as const;
 export type DeliverySortField = (typeof DELIVERY_SORT_FIELDS)[number];
 export type DeliverySort = { field: DeliverySortField; direction: "asc" | "desc" };
 

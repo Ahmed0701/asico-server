@@ -132,6 +132,8 @@ function orderBy({ field, direction }: OpenWorkSort): Prisma.Sql {
         ],
         ", ",
       );
+    case "villaNumber":
+      return Prisma.sql`${natural(Prisma.sql`v."villaNumber"`)}, ep."sortOrder" ASC, w."id" ASC`;
     case "elecPhaseName":
       return Prisma.sql`${natural(Prisma.sql`ep."name"`)}, w."id" ASC`;
     case "status":

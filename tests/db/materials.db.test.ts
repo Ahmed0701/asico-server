@@ -105,6 +105,17 @@ describe.skipIf(!RUN)("materials on a real database (scratch schema)", () => {
     ]);
   });
 
+  it("sorts the deliveries by villa number, both ways", async () => {
+    const repo = new DeliveriesRepository();
+    const notes = async (direction: "asc" | "desc") =>
+      (await repo.list({ sort: { field: "villaNumber", direction }, skip: 0, take: 10 })).rows.map(
+        (r) => r.noteNumber,
+      );
+
+    expect(await notes("asc")).toEqual(["DN-1", "DN-2"]);
+    expect(await notes("desc")).toEqual(["DN-2", "DN-1"]);
+  });
+
   it("finds deliveries by a material and by its name in the search", async () => {
     const repo = new DeliveriesRepository();
 

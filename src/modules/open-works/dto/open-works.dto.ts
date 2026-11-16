@@ -11,6 +11,7 @@ export type PriorityValue = (typeof PRIORITIES)[number];
 // the others are the item's own columns.
 export const OPEN_WORK_SORT_FIELDS = [
   "location",
+  "villaNumber",
   "elecPhaseName",
   "status",
   "priority",

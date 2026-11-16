@@ -186,6 +186,14 @@ function compare(a: StoredWorkItem, b: StoredWorkItem, { field, direction }: Ope
       }
       return byId(a, b);
     }
+    case "villaNumber": {
+      // Natural order of the villa numbers, then the phase's place (always ascending), like the SQL.
+      const villaOf = (item: StoredWorkItem) =>
+        villaTables.villas.find((v) => v.id === item.villaId)?.villaNumber ?? "";
+      const orderOf = (item: StoredWorkItem) =>
+        phaseTables.phases.find((p) => p.id === item.elecPhaseId)?.sortOrder ?? 0;
+      return natural(villaOf(a), villaOf(b)) * sign || orderOf(a) - orderOf(b) || byId(a, b);
+    }
     case "elecPhaseName": {
       const left = phaseTables.phases.find((p) => p.id === a.elecPhaseId)?.name ?? "";
       const right = phaseTables.phases.find((p) => p.id === b.elecPhaseId)?.name ?? "";
