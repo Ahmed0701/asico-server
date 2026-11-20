@@ -40,6 +40,9 @@ const CODES = [
   "Factory",
   "MaterialDelivery",
   "MaterialItem",
+  "OverheadEmployee",
+  "OverheadExpense",
+  "ProgressPayment",
   "AuditLog",
 ] as const;
 
@@ -66,6 +69,9 @@ describe("entity labels", () => {
     ["Factory", "Factory", "مصنع"],
     ["MaterialDelivery", "Material delivery", "توريد مواد"],
     ["MaterialItem", "Catalog material", "مادة في القائمة"],
+    ["OverheadEmployee", "Overhead employee", "موظف مصاريف عامة"],
+    ["OverheadExpense", "Additional expense", "مصروف إضافي"],
+    ["ProgressPayment", "Progress payment", "دفعة إنجاز"],
     ["AuditLog", "Audit log", "سجل التدقيق"],
   ])("%s is %j in English and %j in Arabic", (code, english, arabic) => {
     expect(entityLabel(code, "en")).toBe(english);
@@ -124,6 +130,9 @@ describe("the name field of each entity", () => {
       Factory: "name",
       MaterialDelivery: "noteNumber",
       MaterialItem: "name",
+      OverheadEmployee: "name",
+      OverheadExpense: "description",
+      ProgressPayment: "villaNumber",
       AuditLog: undefined,
     });
   });

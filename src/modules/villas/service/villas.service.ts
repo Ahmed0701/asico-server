@@ -60,6 +60,8 @@ import type {
 } from "../validators/villas.validators.js";
 import { contractorChangeHooks, type ContractorChangeHook } from "./villa-hooks.js";
 import { buildVillaReferences, type VillaReferences } from "./villa-references.js";
+import { countOverheadExpensesOfVilla } from "../../overhead-expenses/repository/overhead-expenses.repository.js";
+import { countProgressPaymentsOfVilla } from "../../monthly-progress/repository/monthly-progress.repository.js";
 
 const DEFAULT_SORT: VillaSort = { field: "location", direction: "asc" };
 const ENTITY = "Villa";
@@ -642,7 +644,9 @@ export class VillasService {
           (await countOwnerNotesOfVilla(id, tx)) > 0 ||
           (await countForemanMissionsOfVilla(id, tx)) > 0 ||
           (await countPaymentsOfVilla(id, tx)) > 0 ||
-          (await countVariationOrdersOfVilla(id, tx)) > 0
+          (await countVariationOrdersOfVilla(id, tx)) > 0 ||
+          (await countOverheadExpensesOfVilla(id, tx)) > 0 ||
+          (await countProgressPaymentsOfVilla(id, tx)) > 0
         ) {
           throw hasRecords(ctx);
         }

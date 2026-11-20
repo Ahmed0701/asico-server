@@ -51,9 +51,15 @@ type ImportBase<Row, Lookups> = {
     cells: Readonly<Record<string, RawCell>>,
     lookups: Lookups,
   ) => { value: Row | undefined; issues: CellIssue[]; skip?: true };
+  // Checks the rows together, once each row is read (a rule across rows, or against what is stored): each problem is
+  // reported on its row like a cell problem, and nothing is saved.
+  checkRows?: (rows: readonly CheckedRow<Row>[], db: Db) => Promise<{ row: number; issue: CellIssue }[]>;
   // Saves the rows and returns the new ids.
   insert: (rows: readonly Row[], db: Db) => Promise<string[]>;
 };
+
+// A row read without problems: its number in the sheet, its value and its cells by header.
+export type CheckedRow<Row> = { row: number; value: Row; cells: Readonly<Record<string, RawCell>> };
 
 // One rule that makes two rows the same record: the same key, whether they are in the file twice or the table already has
 // one. `keyColumn` is the header duplicates are reported on.
@@ -264,6 +270,12 @@ export class ImportRunner {
           });
         }
       });
+    }
+
+    if (definition.checkRows && parsed.length > 0) {
+      for (const { row, issue } of await definition.checkRows(parsed, db)) {
+        issues.add(row, issue);
+      }
     }
 
     if (issues.count > 0 || !write) {

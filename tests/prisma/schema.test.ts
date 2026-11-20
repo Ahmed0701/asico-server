@@ -10,7 +10,7 @@ const schema = readFileSync(new URL("../../prisma/schema.prisma", import.meta.ur
 );
 
 describe("generated Prisma client", () => {
-  it("exposes exactly the 36 approved models", () => {
+  it("exposes exactly the 44 approved models", () => {
     expect(Object.values(Prisma.ModelName).sort()).toEqual(
       [
         "Area",
@@ -35,13 +35,20 @@ describe("generated Prisma client", () => {
         "MaterialItem",
         "Notification",
         "NotificationRecipient",
+        "OverheadEmployee",
+        "OverheadExpense",
+        "OverheadExpenseFile",
         "OwnerNote",
+        "ProgressPayment",
+        "RateLimitHit",
         "PasswordResetToken",
         "Permission",
         "SiteReport",
         "Villa",
         "WorkItem",
         "VillaDocument",
+        "VillaImage",
+        "VillaMaterialOrder",
         "VillaMaterialRequirement",
         "VillaPhaseProgress",
         "RefreshToken",
@@ -49,6 +56,7 @@ describe("generated Prisma client", () => {
         "UserPermission",
         "VariationOrder",
         "VariationOrderFile",
+        "VillaFinance",
       ].sort(),
     );
   });

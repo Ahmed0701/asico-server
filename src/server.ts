@@ -12,7 +12,9 @@ const server = app.listen(env.PORT, () => {
 
 // The hourly check of the small works (due soon and overdue notifications, and the admins' digest email). Several instances may
 // each run it: the job takes a database lock, so only one of them works at a time.
-const alertJob = env.SMALL_WORKS_ALERT_JOB_ENABLED ? startSmallWorksAlertJob() : undefined;
+// Under a cluster only the first worker runs it.
+const firstWorker = (process.env["ASICO_WORKER_INDEX"] ?? "0") === "0";
+const alertJob = env.SMALL_WORKS_ALERT_JOB_ENABLED && firstWorker ? startSmallWorksAlertJob() : undefined;
 
 server.on("error", (err) => {
   logger.fatal({ err }, "server failed to start");

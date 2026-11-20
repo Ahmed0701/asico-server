@@ -5,10 +5,12 @@ import { t } from "../../../core/i18n/index.js";
 import type { Actor, RequestContext } from "../../../core/middleware/requestContext.js";
 import type { FactoryTypeValue } from "../../../shared/constants/enums.js";
 import {
+  foreignKeyConstraint,
   isForeignKeyViolation,
   isRecordNotFound,
   uniqueViolationConstraint,
 } from "../../../shared/utils/index.js";
+import { countVillasOfFactory } from "../../material-vendors/repository/material-vendors.repository.js";
 import type { FactoryDto } from "../dto/materials.dto.js";
 import { toFactoryDto, toFactorySnapshot } from "../mapper/materials.mapper.js";
 import { FactoriesRepository, type Db, type FactoryRow } from "../repository/factories.repository.js";
@@ -30,6 +32,10 @@ const taken = (ctx: RequestContext): AppError => {
 
 const hasDeliveries = (ctx: RequestContext): AppError =>
   new AppError(409, t(ctx.locale, "errors.factoryHasDeliveries"), "FACTORY_HAS_DELIVERIES");
+
+// A factory assigned to supply villas (the Vendors page) is not deleted, nor moved to the other type.
+const assigned = (ctx: RequestContext): AppError =>
+  new AppError(409, t(ctx.locale, "errors.factoryAssigned"), "FACTORY_ASSIGNED");
 
 export class FactoriesService {
   constructor(private readonly repository = new FactoriesRepository()) {}
@@ -72,6 +78,13 @@ export class FactoriesService {
       const row = await this.repository.transaction(async (tx) => {
         const target = await this.lock(id, expectedVersion, ctx, tx);
         await this.assertFree(input.type ?? target.type, input.name ?? target.name, id, ctx, tx);
+        if (
+          input.type !== undefined &&
+          input.type !== target.type &&
+          (await countVillasOfFactory(id, tx)) > 0
+        ) {
+          throw assigned(ctx);
+        }
         const updated = await this.repository.update(
           id,
           target.version,
@@ -112,6 +125,7 @@ export class FactoriesService {
         if ((await this.repository.countDeliveries(id, tx)) > 0) {
           throw hasDeliveries(ctx);
         }
+        if ((await countVillasOfFactory(id, tx)) > 0) throw assigned(ctx);
         if (!(await this.repository.delete(id, target.version, tx))) {
           throw versionConflict(ctx.locale, (await this.repository.lockVersion(id, tx)) ?? target.version);
         }
@@ -128,6 +142,8 @@ export class FactoriesService {
       });
     } catch (err) {
       if (isRecordNotFound(err)) throw factoryNotFound(ctx);
+      // Something referenced it after the counts: a villa assigning it, or a delivery.
+      if (foreignKeyConstraint(err)?.startsWith("Villa_")) throw assigned(ctx);
       throw isForeignKeyViolation(err) ? hasDeliveries(ctx) : err;
     }
   }

@@ -168,6 +168,14 @@ const fakeTx = {
     count: async ({ where }: { where: { villaId: string; status?: string } }): Promise<number> =>
       where.status === "PENDING" ? (pendingVariationOrders.get(where.villaId) ?? 0) : 0,
   },
+  // What the villas count of the additional expenses (overhead-expenses repository): none in these fakes.
+  overheadExpense: {
+    count: async (): Promise<number> => 0,
+  },
+  // What the villas count of the progress payments (monthly-progress repository): none in these fakes.
+  progressPayment: {
+    count: async (): Promise<number> => 0,
+  },
   // What the villas count of the owner notes (owner-notes/repository/owner-note-rows.ts).
   ownerNote: {
     count: async ({ where }: { where: { villaId: string } }): Promise<number> =>

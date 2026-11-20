@@ -62,7 +62,7 @@ describe("toPermissionGroups", () => {
     ]);
   });
 
-  it("groups all 92 real codes into the 21 resources", () => {
+  it("groups all 96 real codes into the 22 resources", () => {
     const groups = toPermissionGroups(PERMISSION_CODES);
 
     expect(groups.map((group) => group.resource)).toEqual([
@@ -79,6 +79,7 @@ describe("toPermissionGroups", () => {
       "maintenance",
       "materials",
       "open-works",
+      "overhead",
       "owner-notes",
       "payments",
       "permissions",
@@ -88,7 +89,7 @@ describe("toPermissionGroups", () => {
       "villa-documents",
       "villas",
     ]);
-    expect(groups.flatMap((group) => group.permissions)).toHaveLength(92);
+    expect(groups.flatMap((group) => group.permissions)).toHaveLength(96);
   });
 });
 

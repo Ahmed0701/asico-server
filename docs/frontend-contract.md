@@ -1046,42 +1046,323 @@ PDF files attached to a villa (a contract, a permit). `POST /villas/:villaId/doc
 
 **Errors:** `FILE_LINK_INVALID`, `FILE_NOT_FOUND`, `FILE_TOO_LARGE`, `INVALID_FILE_TYPE`, `NO_FILE_PROVIDED`, `TOO_MANY_FILES`, `VILLA_DOCUMENT_LIMIT`, `VILLA_NOT_FOUND`
 
+### Villa site images
+
+`GET /villas/:villaId/images` answers `{ data: VillaImageDto[] }`, the newest first. `POST /villas/:villaId/images` takes photos (multipart, each named `file`, up to 20; JPEG or PNG, told by the content; up to 200 on a villa) and answers the villa's images (201). `GET /villa-images/:id/file` sends one image inline (the app fetches it with the session and shows it). `DELETE /villa-images/:id` removes one (204). They need the villa documents' permissions: `villa-documents:download`, `:upload` and `:delete`.
+
+#### `VillaImageDto`
+
+| Field        | Type                   | Notes                                          |
+| ------------ | ---------------------- | ---------------------------------------------- |
+| `id`         | `string`               | UUID.                                          |
+| `villaId`    | `string`               | The villa.                                     |
+| `name`       | `string`               | The file name.                                 |
+| `mime`       | `string`               | `image/jpeg` or `image/png`.                   |
+| `size`       | `number`               | Size in bytes.                                 |
+| `uploadedBy` | `{ id, name } \| null` | Who added it; null when that user was deleted. |
+| `uploadedAt` | `string`               | ISO 8601 instant, UTC.                         |
+
+<!-- modules: villa-images -->
+
+**Errors:** `INVALID_FILE_TYPE`, `NO_FILE_PROVIDED`, `VILLA_IMAGE_LIMIT`, `VILLA_IMAGE_NOT_FOUND`, `VILLA_NOT_FOUND`
+
+### Villa budget
+
+`GET /villas/:villaId/finance` and `PUT /villas/:villaId/finance` answer `{ data: VillaFinanceDto }` with the row's version in `ETag`. The PUT takes any of `budgetMinor` (the villa's own budget, saved in KWD; it moves the villa's version on), `workOrderMinor`, `materialsMinor`, `pettyCashMinor` (KWD fils, 0 or more), `salaryShareBp` (the villa's share of the Department Overhead monthly salaries in hundredths of a percent, 0 to 10000; all villas together at most 10000, or `SALARY_SHARE_OVER_LIMIT`); null clears one; at least one. The salaries are not typed: `salariesMinor` is worked out from the share. Before the first save the version is 0 and the PUT is sent without If-Match; two first saves at once answer the second `VERSION_CONFLICT`.
+
+#### `VillaFinanceDto`
+
+| Field                   | Type                   | Notes                                                                                                                  |
+| ----------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `villaId`               | `string`               | The villa.                                                                                                             |
+| `budgetMinor`           | `number \| null`       | The villa's budget (edited with the villa).                                                                            |
+| `currency`              | `string \| null`       | The budget's currency.                                                                                                 |
+| `variationOrdersMinor`  | `number`               | Every variation order of the villa added up (pending and paid), KWD fils; 0 when none.                                 |
+| `totalBudgetMinor`      | `number \| null`       | Budget plus variation orders; null when there is neither, or the budget is not in KWD.                                 |
+| `workOrderMinor`        | `number \| null`       | Work order value, KWD fils; null when not entered.                                                                     |
+| `salaryShareBp`         | `number \| null`       | The villa's share of the Department Overhead monthly salaries, hundredths of a percent (2500 = 25%); null without one. |
+| `overheadSalariesMinor` | `number`               | The Department Overhead monthly salaries added up (every employee).                                                    |
+| `salariesMinor`         | `number \| null`       | Salaries, KWD fils: the share of the overhead salaries, rounded to the fils; null without a share.                     |
+| `materialsMinor`        | `number \| null`       | Material values, KWD fils.                                                                                             |
+| `pettyCashMinor`        | `number \| null`       | Petty cash, KWD fils.                                                                                                  |
+| `expensesMinor`         | `number`               | The villa's additional expenses (Department Overhead) added up, KWD fils; 0 when none.                                 |
+| `totalCostsMinor`       | `number`               | The five costs added up (those not entered count as 0).                                                                |
+| `remainingMinor`        | `number \| null`       | Total budget minus the costs (negative when over); null without a total budget.                                        |
+| `version`               | `number`               | The finance row's version, 0 before the first save.                                                                    |
+| `updatedAt`             | `string \| null`       | When it was last saved.                                                                                                |
+| `updatedBy`             | `{ id, name } \| null` | Who saved it last.                                                                                                     |
+
+`GET /villa-finance` answers `{ data: VillaFinanceListItemDto[], meta, summary: VillaFinanceSummaryDto }` (page, `search` in the villa number and the location, `sort` of `villaNumber` (default), `totalBudget`, `totalCosts` or `remaining` with `:asc` or `:desc`; villas without the figure go last).
+
+#### `VillaFinanceListItemDto`
+
+The fields of `VillaFinanceDto`, and the villa.
+
+| Field                   | Type                            | Notes                                                                                                                  |
+| ----------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `villa`                 | `{ id, villaNumber, location }` | The villa.                                                                                                             |
+| `villaId`               | `string`                        | The villa's id.                                                                                                        |
+| `budgetMinor`           | `number \| null`                | The villa's budget.                                                                                                    |
+| `currency`              | `string \| null`                | Its currency.                                                                                                          |
+| `variationOrdersMinor`  | `number`                        | Its variation orders added up.                                                                                         |
+| `totalBudgetMinor`      | `number \| null`                | Budget plus variation orders.                                                                                          |
+| `workOrderMinor`        | `number \| null`                | Work order value.                                                                                                      |
+| `salaryShareBp`         | `number \| null`                | The villa's share of the Department Overhead monthly salaries, hundredths of a percent (2500 = 25%); null without one. |
+| `overheadSalariesMinor` | `number`                        | The Department Overhead monthly salaries added up (every employee).                                                    |
+| `salariesMinor`         | `number \| null`                | Salaries (the share of the overhead salaries).                                                                         |
+| `materialsMinor`        | `number \| null`                | Material values.                                                                                                       |
+| `pettyCashMinor`        | `number \| null`                | Petty cash.                                                                                                            |
+| `expensesMinor`         | `number`                        | Additional expenses.                                                                                                   |
+| `totalCostsMinor`       | `number`                        | The five costs added up.                                                                                               |
+| `remainingMinor`        | `number \| null`                | Total budget minus the costs.                                                                                          |
+| `version`               | `number`                        | The finance row's version (0 before the first save).                                                                   |
+| `updatedAt`             | `string \| null`                | When it was last saved.                                                                                                |
+| `updatedBy`             | `{ id, name } \| null`          | Who saved it last.                                                                                                     |
+
+#### `VillaFinanceSummaryDto`
+
+| Field                   | Type     | Notes                                                                                                 |
+| ----------------------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `villaCount`            | `number` | Villas the search matches (all pages).                                                                |
+| `budgetMinor`           | `number` | Their budgets added up (KWD ones).                                                                    |
+| `variationOrdersMinor`  | `number` | Their variation orders added up.                                                                      |
+| `totalBudgetMinor`      | `number` | Their total budgets added up.                                                                         |
+| `totalCostsMinor`       | `number` | Their costs added up.                                                                                 |
+| `remainingMinor`        | `number` | Their remainders added up.                                                                            |
+| `overBudgetCount`       | `number` | Villas whose costs are over their total budget.                                                       |
+| `overheadSalariesMinor` | `number` | The Department Overhead monthly salaries added up.                                                    |
+| `allocatedShareBp`      | `number` | The salary shares of every villa added up (all villas, not only the search), hundredths of a percent. |
+
+<!-- modules: villa-finance -->
+
+**Errors:** `SALARY_SHARE_OVER_LIMIT`, `VILLA_NOT_FOUND`
+
+### Department overhead
+
+`GET /overhead-employees` answers `{ data: OverheadEmployeeDto[], meta, totals: OverheadTotalsDto }` (page, `search` in the name and the role, `sort` of `name` (default), `role`, `salary` or `createdAt` with `:asc` or `:desc`). `GET`, `POST` and `PATCH /overhead-employees/:id` answer `{ data: OverheadEmployeeDto }` with the version in `ETag`. `POST` takes `name` (1 to 120 characters), `role` (one of `ENGINEER`, `FOREMAN`, `WORKER`, `DRIVER`, `OTHER`; the page shows it translated) and `salaryMinor` (the monthly salary in KWD fils, a whole number, 0 or more); `PATCH` takes any of them. Every route needs its own `overhead:*` permission.
+
+#### `OverheadEmployeeDto`
+
+| Field         | Type     | Notes                                                                       |
+| ------------- | -------- | --------------------------------------------------------------------------- |
+| `id`          | `string` | UUID.                                                                       |
+| `name`        | `string` | The employee's name.                                                        |
+| `role`        | `string` | `ENGINEER`, `FOREMAN`, `WORKER`, `DRIVER` or `OTHER`, picked from the list. |
+| `salaryMinor` | `number` | Monthly salary, KWD fils (1 KWD = 1000).                                    |
+| `version`     | `number` | Row version, for If-Match.                                                  |
+| `createdAt`   | `string` | ISO 8601 instant, UTC.                                                      |
+| `updatedAt`   | `string` | ISO 8601 instant, UTC.                                                      |
+
+#### `OverheadTotalsDto`
+
+| Field                | Type     | Notes                                      |
+| -------------------- | -------- | ------------------------------------------ |
+| `count`              | `number` | Employees the search matches (all pages).  |
+| `monthlySalaryMinor` | `number` | Their monthly salaries added up, KWD fils. |
+
+<!-- modules: overhead -->
+
+**Errors:** `OVERHEAD_EMPLOYEE_NOT_FOUND`
+
+### Additional expenses
+
+`GET /overhead-expenses` answers `{ data: OverheadExpenseDto[], meta, totals: OverheadExpenseTotalsDto }` (page, `search` in the description, the invoice number and the villa number, `villaId`, `type`, `sort` of `expenseDate` (default, newest first), `amount`, `villaNumber` or `createdAt` with `:asc` or `:desc`). `GET`, `POST` and `PATCH /overhead-expenses/:id` answer `{ data: OverheadExpenseDto }` with the version in `ETag`. `POST` takes `villaId`, `type` (`INVOICE`, `PURCHASE`, `TRANSPORT` or `OTHER`), `description` (1 to 500 characters), `amountMinor` (KWD fils, a whole number, 0 or more), `expenseDate` (YYYY-MM-DD) and `invoiceNumber` (optional, up to 60 characters; empty or null is none); `PATCH` takes any of them. `POST /overhead-expenses/:id/files` takes PDF, JPEG or PNG files (multipart, each named `file`, up to 10 on one expense; the type is told by the content) and answers the expense. A villa's expenses add up to `expensesMinor` of its `VillaFinanceDto`, and a villa with expenses is not deleted (`VILLA_HAS_RECORDS`). Every route needs an `overhead:*` permission.
+
+#### `OverheadExpenseDto`
+
+| Field           | Type                  | Notes                                          |
+| --------------- | --------------------- | ---------------------------------------------- |
+| `id`            | `string`              | UUID.                                          |
+| `villa`         | `{ id, villaNumber }` | The villa it is for.                           |
+| `type`          | `string`              | `INVOICE`, `PURCHASE`, `TRANSPORT` or `OTHER`. |
+| `description`   | `string`              | What it was.                                   |
+| `amountMinor`   | `number`              | KWD fils (1 KWD = 1000).                       |
+| `expenseDate`   | `string`              | YYYY-MM-DD.                                    |
+| `invoiceNumber` | `string \| null`      | The invoice number, if any.                    |
+| `files`         | `ExpenseFileDto[]`    | The invoice files, oldest first.               |
+| `version`       | `number`              | Row version, for If-Match.                     |
+| `createdAt`     | `string`              | ISO 8601 instant, UTC.                         |
+| `updatedAt`     | `string`              | ISO 8601 instant, UTC.                         |
+
+#### `ExpenseFileDto`
+
+| Field        | Type     | Notes                                                      |
+| ------------ | -------- | ---------------------------------------------------------- |
+| `id`         | `string` | UUID; `GET /overhead-expenses/:id/files/:fileId` shows it. |
+| `name`       | `string` | The file name.                                             |
+| `mime`       | `string` | `application/pdf`, `image/jpeg` or `image/png`.            |
+| `size`       | `number` | Size in bytes.                                             |
+| `uploadedAt` | `string` | ISO 8601 instant, UTC.                                     |
+
+#### `OverheadExpenseTotalsDto`
+
+| Field         | Type     | Notes                                   |
+| ------------- | -------- | --------------------------------------- |
+| `count`       | `number` | Expenses the filters match (all pages). |
+| `amountMinor` | `number` | Their amounts added up, KWD fils.       |
+
+<!-- modules: overhead-expenses -->
+
+**Errors:** `INVALID_FILE_TYPE`, `NO_FILE_PROVIDED`, `OVERHEAD_EXPENSE_FILE_LIMIT`, `OVERHEAD_EXPENSE_FILE_NOT_FOUND`, `OVERHEAD_EXPENSE_NOT_FOUND`, `VILLA_NOT_FOUND`
+
+### Villa vendors
+
+`GET /villas/:villaId/vendors` answers `{ data: VillaVendorsDto }` for one villa, on the list or not (`listedAt` null when not), with its version in `ETag` (needs `materials:read`). The list holds only the villas added to it by hand. `GET /material-vendors/available` answers `{ data: { id, villaNumber }[] }`: the villas not on it yet, in natural order. `POST /villas/:villaId/vendors` adds one (`VILLA_ALREADY_IN_VENDORS` when it is there) and answers `{ data: VillaVendorsDto }` (201); `DELETE /villas/:villaId/vendors` takes one off, with its assigned factories (204, the villa's version as If-Match). Both need `materials:update`; assigning factories to a villa not on the list is `VILLA_NOT_IN_VENDORS`.
+
+`GET /material-vendors` answers `{ data: VillaVendorsDto[], meta, summary: VillaVendorsSummaryDto }` (needs `materials:read`). `search` looks in the villa number, the location and the assigned factory names; `factoryId` keeps the villas that factory is assigned to; `missing` (`SWITCHGEAR` or `CABLE`) keeps the villas with no factory of that type yet; `sort` is `villaNumber` (natural order) with `:asc` (default) or `:desc`.
+
+`PUT /villas/:villaId/vendors` takes any of `switchgearFactoryId` and `cableFactoryId` (a factory of that type; null takes it off; at least one) with the villa's version as If-Match, and answers `{ data: VillaVendorsDto }` with the new version in `ETag` (the villa's version moves on). Needs `materials:update`. A factory assigned to villas is not deleted, nor moved to the other type (`FACTORY_ASSIGNED`).
+
+#### `VillaVendorsDto`
+
+| Field        | Type                            | Notes                                             |
+| ------------ | ------------------------------- | ------------------------------------------------- |
+| `villa`      | `{ id, villaNumber, location }` | The villa.                                        |
+| `switchgear` | `{ id, name } \| null`          | The assigned switchgear factory; null while none. |
+| `cable`      | `{ id, name } \| null`          | The assigned cable factory.                       |
+| `version`    | `number`                        | The villa's version, for If-Match.                |
+| `listedAt`   | `string                         | null`                                             | When the villa was added to the list, ISO 8601 instant, UTC; null when it is not on it. |
+
+#### `VillaVendorsSummaryDto`
+
+| Field            | Type     | Notes                                                                                                   |
+| ---------------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| `villaCount`     | `number` | Villas the filters match (all pages).                                                                   |
+| `withSwitchgear` | `number` | Of them, those with a switchgear factory assigned.                                                      |
+| `withCable`      | `number` | Those with a cable factory assigned.                                                                    |
+| `withNone`       | `number` | Every villa of the project, on the list or not, with no factory assigned at all (whatever the filters). |
+
+<!-- modules: material-vendors -->
+
+**Errors:** `FACTORY_NOT_FOUND`, `FACTORY_WRONG_TYPE`, `VILLA_ALREADY_IN_VENDORS`, `VILLA_NOT_FOUND`, `VILLA_NOT_IN_VENDORS`
+
+### Material orders
+
+The Orders tab of Materials. `GET /material-orders` answers `{ data: MaterialOrderDto[], meta, summary: MaterialOrdersSummaryDto }` (needs `materials:read`): every villa twice, once for switchgear and once for cables, with the dates of its material request (MR), purchase order (PO) and when the materials are due, and whether everything it needs of that type came.
+
+- `search` looks in the villa number; `type` is `SWITCHGEAR` or `CABLE`; `status` is `DELIVERED`, `PARTIAL`, `NOT_DELIVERED` or `NOT_REQUIRED`; `overdue=true` keeps the rows whose due date has passed with materials still to come; `sort` is `villaNumber` (default) or `dueDate` (empty last), with `:asc` or `:desc`.
+- `PUT /villas/:villaId/material-orders/:type` sets the three dates of one villa and type (needs `materials:update`). Body: `mrDate`, `poDate`, `dueDate`, each `YYYY-MM-DD` or `null` (all three are sent). A PO date before the MR date is `MATERIAL_ORDER_DATES_INVALID`. Answers `{ data: MaterialOrderDto }`.
+- The status comes from the balance: `DELIVERED` when every material of that type the villa needs came in full, `PARTIAL` when some of it came, `NOT_DELIVERED` when nothing came, `NOT_REQUIRED` when it needs none of that type. A row whose due date is before today (APP_TIMEZONE) with `PARTIAL` or `NOT_DELIVERED` is `overdue`.
+
+#### `MaterialOrderDto`
+
+| Field              | Type                   | Notes                                                            |
+| ------------------ | ---------------------- | ---------------------------------------------------------------- |
+| `villa`            | `{ id, villaNumber }`  | The villa.                                                       |
+| `type`             | `string`               | `SWITCHGEAR` or `CABLE`.                                         |
+| `factory`          | `{ id, name } \| null` | The factory assigned to the villa for this type (Vendors).       |
+| `mrDate`           | `string \| null`       | `YYYY-MM-DD`, as entered.                                        |
+| `poDate`           | `string \| null`       | `YYYY-MM-DD`, as entered.                                        |
+| `dueDate`          | `string \| null`       | `YYYY-MM-DD`, as entered.                                        |
+| `deliveryMrDate`   | `string \| null`       | The earliest MR date on the villa's delivery notes of this type. |
+| `deliveryPoDate`   | `string \| null`       | The earliest PO date on the villa's delivery notes of this type. |
+| `lastDeliveryDate` | `string \| null`       | The day of its latest delivery of this type.                     |
+| `requiredItems`    | `number`               | The materials of this type it needs.                             |
+| `completeItems`    | `number`               | Of them, those that came in full.                                |
+| `status`           | `string`               | `DELIVERED`, `PARTIAL`, `NOT_DELIVERED` or `NOT_REQUIRED`.       |
+| `overdue`          | `boolean`              | The due date has passed and not everything came.                 |
+
+#### `MaterialOrdersSummaryDto`
+
+| Field          | Type     | Notes                               |
+| -------------- | -------- | ----------------------------------- |
+| `total`        | `number` | Rows the filters match (all pages). |
+| `delivered`    | `number` | Of them, `DELIVERED`.               |
+| `partial`      | `number` | Of them, `PARTIAL`.                 |
+| `notDelivered` | `number` | Of them, `NOT_DELIVERED`.           |
+| `overdue`      | `number` | Of them, overdue.                   |
+
+<!-- modules: material-orders -->
+
+**Errors:** `MATERIAL_ORDER_DATES_INVALID`, `VILLA_NOT_FOUND`
+
 ### Monthly progress
 
-`GET /monthly-progress` answers `{ data: MonthlyProgressItemDto[], meta, summary: MonthlyProgressSummaryDto }`. It needs `villas:read`.
+The Monthly Payments page. `GET /monthly-progress` answers `{ data: MonthlyProgressItemDto[], meta, summary: MonthlyProgressSummaryDto }` (needs `villas:read`): each villa's progress now (worked out from its open works with the active phases' ratios), when its open works last changed, its last payment, and what its contractor is owed now: the progress since that payment times the villa's Work Order Value.
 
-- `month` is YYYY-MM in APP_TIMEZONE, the current month when not sent; a later month is `MONTH_IN_FUTURE`. The month's figures are as at its end (as of now for the current month), the month before's as at the start of `month`.
-- The overall progress is never stored: a past figure is rebuilt from the audit log of the open works (each create, edit and delete records the work's villa, phase and progress), with the active phases and their progress ratios as they are now.
-- A villa added after the month is left out; one added during it has `previousProgress: null` (its change counts from 0).
-- `search` looks in the villa number, the location and the contractor's name. `sort` is `villaNumber` (default, natural order), `previous`, `current` or `change`, with `:asc` or `:desc`.
+- `search` looks in the villa number, the location and the contractor's name; `owed=true` keeps the villas with unpaid progress; `contractorId` keeps one contractor's villas; `sort` is `villaNumber` (default, natural order), `current`, `unpaid` or `due`, with `:asc` or `:desc`.
+- `GET /villas/:villaId/progress-payments` is the villa's payment history (needs `payments:read`): `{ data: VillaPaymentHistoryItemDto[], summary: VillaPaymentHistorySummaryDto }`, every payment, the latest first. No such villa is `VILLA_NOT_FOUND`.
+- `POST /villas/:villaId/progress-payments` pays the villa's contractor what it is owed now (needs `payments:create`) and answers `{ data: ProgressPaymentDto }` (201). The payment records the progress paid up to, so the next amount owed starts from it. Nothing owed is `NOTHING_TO_PAY`; a villa without a Work Order Value is `WORK_ORDER_MISSING`.
+- `POST /villas/:villaId/progress-payments/manual` enters a payment made before the system (needs `payments:create`) and answers `{ data: ProgressPaymentDto }` (201) with `manual: true`. Body: `paidOn` (`YYYY-MM-DD`, not after today, else `PAID_DATE_IN_FUTURE`), `ratio` (the progress it paid up to, 0.1 to 100, one decimal), `amountMinor` (KWD fils), optional `contractorId` (the villa's contractor when left out, `null` for none; an unknown one is `CONTRACTOR_NOT_FOUND`) and optional `note` (up to 2000 characters). By date it must fit between the villa's payments: more than the ratio of the one before it and less than the one after it, else `PAID_RATIO_OUT_OF_ORDER`. A villa without a Work Order Value is `WORK_ORDER_MISSING`.
+- `GET /progress-payments/import/template` and `POST /progress-payments/import` import payments made before the system for any villas from Excel (needs `payments:create`; the import rules, report and `Idempotency-Key` of every import). Columns: `Villa Number`, `Paid On`, `Paid Up To (%)`, `Amount (KWD)`, optional `Contractor` (empty: the villa's) and optional `Note`. For each villa the ratios must rise with the dates, against the payments already stored too; each row is saved like one entered by hand (`manual: true`).
+- `DELETE /progress-payments/:id` takes back a payment (needs `payments:delete`, 204): one the system recorded only while it is the villa's latest (an older one is `PROGRESS_PAYMENT_NOT_LATEST`), one entered by hand at any time. A villa with payments is not deleted (`VILLA_HAS_RECORDS`).
 
 #### `MonthlyProgressItemDto`
 
-| Field              | Type                            | Notes                                                                           |
-| ------------------ | ------------------------------- | ------------------------------------------------------------------------------- |
-| `villa`            | `{ id, villaNumber, location }` | The villa.                                                                      |
-| `contractor`       | `{ id, name } \| null`          | Its contractor now.                                                             |
-| `previousProgress` | `number \| null`                | 0 to 100 at the end of the month before; null when the villa did not exist yet. |
-| `currentProgress`  | `number`                        | 0 to 100 at the end of `month` (now for the current month).                     |
-| `change`           | `number`                        | `currentProgress` minus `previousProgress` (0 when null), one decimal.          |
+| Field             | Type                            | Notes                                                                                                        |
+| ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `villa`           | `{ id, villaNumber, location }` | The villa.                                                                                                   |
+| `contractor`      | `{ id, name } \| null`          | Its contractor now.                                                                                          |
+| `currentProgress` | `number`                        | 0 to 100 now, one decimal.                                                                                   |
+| `lastUpdatedAt`   | `string \| null`                | When one of its open works last changed; null when it has none.                                              |
+| `lastPayment`     | `ProgressPaymentDto \| null`    | Its latest payment; null before the first.                                                                   |
+| `paidProgress`    | `number`                        | The progress paid up to (the last payment's), 0 without one.                                                 |
+| `unpaidProgress`  | `number`                        | `currentProgress` minus `paidProgress`, never below 0.                                                       |
+| `workOrderMinor`  | `number \| null`                | The villa's Work Order Value, KWD fils; null when not entered.                                               |
+| `dueMinor`        | `number`                        | What the contractor is owed now: `unpaidProgress` % of `workOrderMinor`, rounded to the fils; 0 without one. |
+
+#### `ProgressPaymentDto`
+
+| Field            | Type                   | Notes                                                  |
+| ---------------- | ---------------------- | ------------------------------------------------------ |
+| `id`             | `string`               | UUID.                                                  |
+| `ratio`          | `number`               | The progress paid up to, 0 to 100, one decimal.        |
+| `amountMinor`    | `number`               | What was paid, KWD fils.                               |
+| `workOrderMinor` | `number`               | The Work Order Value it was worked out with, KWD fils. |
+| `paidAt`         | `string`               | ISO 8601 instant, UTC.                                 |
+| `contractor`     | `{ id, name } \| null` | The contractor paid; null when it was deleted.         |
+| `paidBy`         | `{ id, name } \| null` | Who recorded it; null when that user was deleted.      |
+| `manual`         | `boolean`              | Entered by hand (a payment made before the system).    |
+| `note`           | `string \| null`       | The note given with it.                                |
+
+#### `VillaPaymentHistoryItemDto`
+
+| Field            | Type             | Notes                                                                          |
+| ---------------- | ---------------- | ------------------------------------------------------------------------------ |
+| `id`             | `string`         | UUID.                                                                          |
+| `fromRatio`      | `number`         | The progress it was paid from: the payment before it's ratio, 0 for the first. |
+| `ratio`          | `number`         | The progress paid up to, 0 to 100, one decimal.                                |
+| `amountMinor`    | `number`         | What was paid, KWD fils.                                                       |
+| `workOrderMinor` | `number`         | The Work Order Value it was worked out with, KWD fils.                         |
+| `paidAt`         | `string`         | ISO 8601 instant, UTC.                                                         |
+| `contractor`     | `{ id, name }    | null`                                                                          | The contractor paid; null when it was deleted.    |
+| `paidBy`         | `{ id, name }    | null`                                                                          | Who recorded it; null when that user was deleted. |
+| `manual`         | `boolean`        | Entered by hand (a payment made before the system).                            |
+| `note`           | `string \| null` | The note given with it.                                                        |
+
+#### `VillaPaymentHistorySummaryDto`
+
+| Field             | Type             | Notes                                                          |
+| ----------------- | ---------------- | -------------------------------------------------------------- |
+| `count`           | `number`         | How many payments.                                             |
+| `totalPaidMinor`  | `number`         | Every payment together, KWD fils.                              |
+| `paidProgress`    | `number`         | The progress paid up to (the latest payment's), 0 without one. |
+| `currentProgress` | `number`         | 0 to 100 now, one decimal.                                     |
+| `unpaidProgress`  | `number`         | `currentProgress` minus `paidProgress`, never below 0.         |
+| `workOrderMinor`  | `number \| null` | The villa's Work Order Value, KWD fils; null when not entered. |
+| `dueMinor`        | `number`         | What the contractor is owed now, KWD fils.                     |
 
 #### `MonthlyProgressSummaryDto`
 
-| Field             | Type      | Notes                                                              |
-| ----------------- | --------- | ------------------------------------------------------------------ |
-| `month`           | `string`  | YYYY-MM asked for.                                                 |
-| `previousMonth`   | `string`  | YYYY-MM before it.                                                 |
-| `isCurrentMonth`  | `boolean` | True when `month` is the current month: its figures are as of now. |
-| `villaCount`      | `number`  | Villas the filters match (all pages).                              |
-| `averagePrevious` | `number`  | Average `previousProgress` of those that existed, one decimal.     |
-| `averageCurrent`  | `number`  | Average `currentProgress`, one decimal.                            |
-| `averageChange`   | `number`  | Average `change`, one decimal.                                     |
-| `improvedCount`   | `number`  | Villas whose progress went up in the month.                        |
-| `unchangedCount`  | `number`  | Villas whose progress did not move.                                |
+| Field                   | Type                        | Notes                                                                                            |
+| ----------------------- | --------------------------- | ------------------------------------------------------------------------------------------------ |
+| `villaCount`            | `number`                    | Villas the filters match (all pages).                                                            |
+| `owedCount`             | `number`                    | Of them, those with unpaid progress.                                                             |
+| `totalDueMinor`         | `number`                    | What is owed for them all together, KWD fils.                                                    |
+| `missingWorkOrderCount` | `number`                    | Villas with unpaid progress but no Work Order Value.                                             |
+| `contractors`           | `MonthlyContractorDueDto[]` | Each contractor with something owed, the most first; villas without a contractor together, last. |
+
+#### `MonthlyContractorDueDto`
+
+| Field        | Type                   | Notes                                            |
+| ------------ | ---------------------- | ------------------------------------------------ |
+| `contractor` | `{ id, name } \| null` | The contractor; null for the villas without one. |
+| `villaCount` | `number`               | Its villas with unpaid progress.                 |
+| `dueMinor`   | `number`               | What it is owed for them, KWD fils.              |
 
 <!-- modules: monthly-progress -->
 
-**Errors:** `MONTH_IN_FUTURE`
+**Errors:** `CONTRACTOR_NOT_FOUND`, `NO_FILE_PROVIDED`, `NOTHING_TO_PAY`, `PAID_DATE_IN_FUTURE`, `PAID_RATIO_OUT_OF_ORDER`, `PROGRESS_PAYMENT_NOT_FOUND`, `PROGRESS_PAYMENT_NOT_LATEST`, `VILLA_NOT_FOUND`, `WORK_ORDER_MISSING`
 
 ## Records of a villa
 

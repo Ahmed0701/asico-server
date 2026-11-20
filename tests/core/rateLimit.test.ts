@@ -58,7 +58,12 @@ function appWith(
 
 describe("createRateLimiter with a key and a live limit", () => {
   it("counts each key on its own and answers 429 TOO_MANY_REQUESTS past the limit, in the request language", async () => {
-    const limiter = createRateLimiter({ windowMs: 60_000, limit: 2, keyGenerator: userOrIpKey });
+    const limiter = createRateLimiter({
+      name: "test",
+      windowMs: 60_000,
+      limit: 2,
+      keyGenerator: userOrIpKey,
+    });
     const app = appWith(limiter, (req) => ({ id: String(req.headers["x-user"]) }));
     const get = (user: string, language = "en") =>
       request(app).get("/x").set("X-User", user).set("Accept-Language", language);
@@ -73,7 +78,12 @@ describe("createRateLimiter with a key and a live limit", () => {
   });
 
   it("falls back to the IP when there is no user", async () => {
-    const limiter = createRateLimiter({ windowMs: 60_000, limit: 1, keyGenerator: userOrIpKey });
+    const limiter = createRateLimiter({
+      name: "test",
+      windowMs: 60_000,
+      limit: 1,
+      keyGenerator: userOrIpKey,
+    });
     const app = appWith(limiter, () => undefined);
 
     expect((await request(app).get("/x")).status).toBe(200);
@@ -82,7 +92,12 @@ describe("createRateLimiter with a key and a live limit", () => {
 
   it("reads the limit again on every request when it is a function", async () => {
     let limit = 1;
-    const limiter = createRateLimiter({ windowMs: 60_000, limit: () => limit, keyGenerator: userOrIpKey });
+    const limiter = createRateLimiter({
+      name: "test",
+      windowMs: 60_000,
+      limit: () => limit,
+      keyGenerator: userOrIpKey,
+    });
     const app = appWith(limiter, () => ({ id: "same" }));
 
     expect((await request(app).get("/x")).status).toBe(200);
@@ -92,7 +107,12 @@ describe("createRateLimiter with a key and a live limit", () => {
   });
 
   it("sends the standard rate-limit headers", async () => {
-    const limiter = createRateLimiter({ windowMs: 60_000, limit: 3, keyGenerator: userOrIpKey });
+    const limiter = createRateLimiter({
+      name: "test",
+      windowMs: 60_000,
+      limit: 3,
+      keyGenerator: userOrIpKey,
+    });
     const app = appWith(limiter, () => ({ id: "h" }));
 
     const res = await request(app).get("/x");

@@ -61,6 +61,7 @@ const ENGLISH: Record<string, string> = {
   "export.site-reports": "Exported site reports",
   "export.material-deliveries": "Exported material deliveries",
   "export.payments": "Exported payments",
+  "export.progress-payments": "Exported a villa's payment history",
   "export.material-balance": "Exported the material balance",
   "export.small-works": "Exported daily small works",
   "export.villas": "Exported villas",
@@ -139,14 +140,32 @@ const ENGLISH: Record<string, string> = {
   "material_item.delete": "Deleted a catalog material",
   "villa.material_requirements": "Changed the materials a villa needs",
   "villa.mew_states": "Changed a villa's MEW states",
+  "villa.finance": "Updated a villa's budget figures",
+  "villa.vendors": "Assigned a villa's switchgear and cable factories",
+  "villa.vendors_add": "Added a villa to the Vendors list",
+  "villa.vendors_remove": "Took a villa off the Vendors list",
+  "overhead.create": "Added an overhead employee",
+  "overhead.update": "Updated an overhead employee",
+  "overhead.delete": "Deleted an overhead employee",
+  "overhead_expense.create": "Added an additional expense",
+  "overhead_expense.update": "Updated an additional expense",
+  "overhead_expense.delete": "Deleted an additional expense",
+  "overhead_expense.file_upload": "Attached files to an additional expense",
+  "overhead_expense.file_delete": "Removed a file from an additional expense",
   "villa_document.upload": "Uploaded a villa document",
   "villa_document.delete": "Deleted a villa document",
+  "villa_image.upload": "Added site images to a villa",
+  "villa_image.delete": "Removed a site image from a villa",
+  "progress_payment.create": "Paid a contractor for a villa's progress",
+  "progress_payment.delete": "Took back a progress payment",
+  "progress_payment.import": "Imported previous payments",
+  "material_order.update": "Changed a villa's material order dates",
 };
 
 describe("action labels", () => {
   it("knows exactly the actions of the list above", () => {
     expect(Object.keys(ACTION_LABEL_KEYS).sort()).toEqual(Object.keys(ENGLISH).sort());
-    expect(Object.keys(ENGLISH)).toHaveLength(122);
+    expect(Object.keys(ENGLISH)).toHaveLength(141);
   });
 
   it.each(Object.entries(ENGLISH))("%s reads %j in English", (code, english) => {

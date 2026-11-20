@@ -23,6 +23,8 @@ const select = {
   },
   noteNumber: true,
   deliveryDate: true,
+  mrDate: true,
+  poDate: true,
   notes: {
     select: { id: true, key: true, name: true, mime: true, size: true, uploadedAt: true },
     orderBy: [{ uploadedAt: "asc" }, { id: "asc" }],
@@ -55,6 +57,8 @@ export type DeliveryFields = {
   factoryId?: string;
   noteNumber?: string | null;
   deliveryDate?: Date;
+  mrDate?: Date | null;
+  poDate?: Date | null;
 };
 
 export type NewDelivery = {
@@ -62,6 +66,8 @@ export type NewDelivery = {
   factoryId: string;
   noteNumber: string | null;
   deliveryDate: Date;
+  mrDate: Date | null;
+  poDate: Date | null;
   lines: LineInput[];
 };
 

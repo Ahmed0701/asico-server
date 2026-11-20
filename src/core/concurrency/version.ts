@@ -29,6 +29,8 @@ export const VERSIONED_TABLES = [
   "Factory",
   "MaterialDelivery",
   "MaterialItem",
+  "OverheadEmployee",
+  "OverheadExpense",
 ] as const;
 export type VersionedTable = (typeof VERSIONED_TABLES)[number];
 

@@ -106,11 +106,14 @@ model User {
   mewInspectionVillas Villa[]                 @relation("VillaMewInspectionMarker")
   mewPassedVillas     Villa[]                 @relation("VillaMewInspectionPassedMarker")
   uploadedDocuments   VillaDocument[]         @relation("DocumentUploader")
+  uploadedVillaImages VillaImage[]            @relation("VillaImageUploader")
+  progressPayments    ProgressPayment[]       @relation("ProgressPaymentPayer")
   auditLogs           AuditLog[]
   idempotencyKeys     IdempotencyKey[]
   importBatches       ImportBatch[]
   workItems           WorkItem[]              @relation("WorkItemCreator")
   progressWorkItems   WorkItem[]              @relation("WorkItemProgressUpdater")
+  villaFinances       VillaFinance[]
   dailyReports        DailyReport[]
   dailySmallWorks     DailySmallWork[]
   siteReports         SiteReport[]
@@ -217,23 +220,24 @@ model ElecPhase {
 }
 
 model Contractor {
-  id              String              @id @default(uuid())
-  name            String
-  phone           String
-  email           String?
-  status          PartyStatus         @default(ACTIVE)
-  villas          Villa[]
-  workItems       WorkItem[]
+  id               String              @id @default(uuid())
+  name             String
+  phone            String
+  email            String?
+  status           PartyStatus         @default(ACTIVE)
+  villas           Villa[]
+  workItems        WorkItem[]
   // The daily reports of this contractor. A contractor with reports cannot be deleted.
-  dailyReports    DailyReport[]
+  dailyReports     DailyReport[]
   // The labour rows that name this contractor. A contractor with labour rows cannot be deleted either.
-  dailyLabours    DailyLabour[]
-  payments        ContractorPayment[]
+  dailyLabours     DailyLabour[]
+  payments         ContractorPayment[]
+  progressPayments ProgressPayment[]
   // The small works this contractor is assigned to. A contractor with small works cannot be deleted either.
-  dailySmallWorks DailySmallWork[]
-  version         Int                 @default(1)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  dailySmallWorks  DailySmallWork[]
+  version          Int                 @default(1)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "Contractor_name_trgm_idx")
 }
@@ -245,13 +249,16 @@ model Contractor {
 // villas. solvedAt is set when someone checks it as solved, which moves it to the solved list.
 // A switchgear or cable factory that delivers material to the villas. The same name can exist once per type.
 model Factory {
-  id         String             @id @default(uuid())
-  name       String
-  type       FactoryType
-  deliveries MaterialDelivery[]
-  version    Int                @default(1)
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  id               String             @id @default(uuid())
+  name             String
+  type             FactoryType
+  deliveries       MaterialDelivery[]
+  // The villas it is assigned to supply, by type: a factory assigned to a villa cannot be deleted.
+  switchgearVillas Villa[]            @relation("VillaSwitchgearFactory")
+  cableVillas      Villa[]            @relation("VillaCableFactory")
+  version          Int                @default(1)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   @@unique([type, name])
 }
@@ -286,6 +293,19 @@ model VillaMaterialRequirement {
 
   @@id([villaId, itemId])
   @@index([itemId])
+}
+
+// The MR, PO and due dates of a villa's materials of one factory type (the Material Orders tab). Removed with the villa.
+model VillaMaterialOrder {
+  villaId   String
+  villa     Villa       @relation(fields: [villaId], references: [id], onDelete: Cascade)
+  type      FactoryType
+  mrDate    DateTime?   @db.Date
+  poDate    DateTime?   @db.Date
+  dueDate   DateTime?   @db.Date
+  updatedAt DateTime    @updatedAt
+
+  @@id([villaId, type])
 }
 
 // A delivery note file of a delivery (a PDF, JPG or PNG). A delivery can have several; they go with it.
@@ -326,6 +346,9 @@ model MaterialDelivery {
   factory      Factory                @relation(fields: [factoryId], references: [id], onDelete: Restrict)
   noteNumber   String?
   deliveryDate DateTime               @db.Date
+  // The material request (MR) and purchase order (PO) of the delivery: their dates, when known.
+  mrDate       DateTime?              @db.Date
+  poDate       DateTime?              @db.Date
   lines        MaterialDeliveryLine[]
   version      Int                    @default(1)
   createdAt    DateTime               @default(now())
@@ -447,6 +470,76 @@ model VariationOrder {
   @@unique([villaId, voNumber])
 }
 
+// An additional expense of the department (an invoice, a purchase, transport...), entered on the Department Overhead
+// page for one villa: it adds to that villa's costs. KWD fils, never negative. A villa with expenses is not deleted.
+model OverheadExpense {
+  id            String                @id @default(uuid())
+  villaId       String
+  type          String
+  description   String
+  amountMinor   BigInt
+  expenseDate   DateTime              @db.Date
+  invoiceNumber String?
+  version       Int                   @default(1)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  villa         Villa                 @relation(fields: [villaId], references: [id], onDelete: Restrict)
+  files         OverheadExpenseFile[]
+
+  @@index([villaId])
+  @@index([expenseDate])
+}
+
+// An invoice file of an additional expense (a PDF or a photo), kept in the uploads folder under `key`.
+model OverheadExpenseFile {
+  id         String          @id @default(uuid())
+  expenseId  String
+  expense    OverheadExpense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  key        String
+  name       String
+  mime       String
+  size       Int
+  uploadedAt DateTime        @default(now())
+
+  @@index([expenseId])
+}
+
+// An employee of the department's overhead (the Department Overhead page): not paid by one villa. The salary is
+// monthly, in KWD fils, never negative.
+model OverheadEmployee {
+  id          String   @id @default(uuid())
+  name        String
+  role        String
+  salaryMinor BigInt
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+}
+
+// The money of a villa besides its budget (the Villa Budget card of the villa page): the work order value, the salaries, the
+// material values and the petty cash, each in KWD fils, null until it is entered. One row a villa, made the first time
+// one is saved; it goes with the villa (CASCADE). The budget itself stays on the villa.
+model VillaFinance {
+  villaId        String   @id
+  villa          Villa    @relation(fields: [villaId], references: [id], onDelete: Cascade)
+  workOrderMinor BigInt?
+  // Hand-entered salaries from before the Department Overhead split. Kept, no longer read: the salaries are now the
+  // villa share of the overhead (salaryShareBp).
+  salariesMinor  BigInt?
+  // The villa share of the Department Overhead monthly salaries, in hundredths of a percent (2500 = 25%).
+  salaryShareBp  Int?
+  materialsMinor BigInt?
+  pettyCashMinor BigInt?
+  version        Int      @default(1)
+  updatedAt      DateTime @updatedAt
+  updatedById    String?
+  updatedBy      User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedById])
+}
+
 // A PDF of a variation order, kept in the uploads folder under `key`.
 model VariationOrderFile {
   id               String         @id @default(uuid())
@@ -537,12 +630,24 @@ model Villa {
   mewInspectionBy         User?                      @relation("VillaMewInspectionMarker", fields: [mewInspectionById], references: [id], onDelete: SetNull)
   mewInspectionPassedBy   User?                      @relation("VillaMewInspectionPassedMarker", fields: [mewInspectionPassedById], references: [id], onDelete: SetNull)
   documents               VillaDocument[]
+  images                  VillaImage[]
+  progressPayments        ProgressPayment[]
   materialDeliveries      MaterialDelivery[]
   ownerNotes              OwnerNote[]
   foremanMissions         ForemanMission[]
   payments                ContractorPayment[]
   variationOrders         VariationOrder[]
+  overheadExpenses        OverheadExpense[]
+  finance                 VillaFinance?
+  // When the villa was added to the Vendors list (by hand); null while it is not on it.
+  vendorsListedAt         DateTime?
+  // The factories assigned to supply the villa (the Vendors page): one switchgear factory and one cable factory.
+  switchgearFactoryId     String?
+  switchgearFactory       Factory?                   @relation("VillaSwitchgearFactory", fields: [switchgearFactoryId], references: [id], onDelete: Restrict)
+  cableFactoryId          String?
+  cableFactory            Factory?                   @relation("VillaCableFactory", fields: [cableFactoryId], references: [id], onDelete: Restrict)
   materialRequirements    VillaMaterialRequirement[]
+  materialOrders          VillaMaterialOrder[]
   phaseProgress           VillaPhaseProgress[]
   workItems               WorkItem[]
   dailySmallWorks         DailySmallWork[]
@@ -557,6 +662,8 @@ model Villa {
   @@index([mewFollowUpById])
   @@index([mewInspectionById])
   @@index([mewInspectionPassedById])
+  @@index([switchgearFactoryId])
+  @@index([cableFactoryId])
   @@index([ownerName(ops: raw("gin_trgm_ops"))], type: Gin, map: "Villa_ownerName_trgm_idx")
   @@index([villaNumber(ops: raw("gin_trgm_ops"))], type: Gin, map: "Villa_villaNumber_trgm_idx")
   @@index([plot(ops: raw("gin_trgm_ops"))], type: Gin, map: "Villa_plot_trgm_idx")
@@ -811,6 +918,48 @@ model VillaDocument {
   @@index([villaId])
 }
 
+// A photo of the villa site (the Site Images section of the villa page), kept in the villa's folder under `key`. The
+// rows go with the villa; its folder is removed after the villa is deleted.
+model VillaImage {
+  id           String   @id @default(uuid())
+  villaId      String
+  villa        Villa    @relation(fields: [villaId], references: [id], onDelete: Cascade)
+  key          String   @unique
+  name         String
+  mime         String
+  size         Int
+  uploadedById String?
+  uploadedBy   User?    @relation("VillaImageUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedAt   DateTime @default(now())
+
+  @@index([villaId, uploadedAt])
+  @@index([uploadedById])
+}
+
+// A payment to a villa's contractor for its progress (the Monthly Payments page): the villa's progress paid up to
+// (`ratioTenths`, tenths of a percent: 655 = 65.5%), what it came to (the progress since the payment before times the
+// Work Order Value of then, KWD fils), and that Work Order Value. The next amount due starts from the latest one. A villa
+// with payments is not deleted; a contractor deleted leaves its payments without it.
+model ProgressPayment {
+  id             String      @id @default(uuid())
+  villaId        String
+  villa          Villa       @relation(fields: [villaId], references: [id], onDelete: Restrict)
+  contractorId   String?
+  contractor     Contractor? @relation(fields: [contractorId], references: [id], onDelete: SetNull)
+  ratioTenths    Int
+  amountMinor    BigInt
+  workOrderMinor BigInt
+  paidAt         DateTime    @default(now())
+  paidById       String?
+  paidBy         User?       @relation("ProgressPaymentPayer", fields: [paidById], references: [id], onDelete: SetNull)
+  manual         Boolean     @default(false)
+  note           String?
+
+  @@index([villaId, paidAt])
+  @@index([contractorId])
+  @@index([paidById])
+}
+
 model AuditLog {
   id        String   @id @default(uuid())
   actorId   String?
@@ -869,4 +1018,14 @@ model IdempotencyKey {
 
   @@unique([userId, key])
   @@index([expiresAt])
+}
+
+// The rate limit counters shared by the server processes of a cluster (WEB_CONCURRENCY above 1): one row per limiter and
+// client, with the hits of the current window and when it ends. Old rows are removed as new ones are counted.
+model RateLimitHit {
+  key     String   @id
+  hits    Int
+  resetAt DateTime @db.Timestamptz(3)
+
+  @@index([resetAt])
 }

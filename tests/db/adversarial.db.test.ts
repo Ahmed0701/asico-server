@@ -433,10 +433,9 @@ describe.skipIf(!RUN)("the hard test (real HTTP, real PostgreSQL, scratch schema
       for (const query of ["limit=1001", "limit=0", "page=0", "page=-1", "limit=abc"]) {
         expect((await api().get(`/payments?${query}`)).status, query).toBe(400);
       }
-      expect((await api().get("/monthly-progress?month=9999-12")).body.code).toBe("MONTH_IN_FUTURE");
-      const old = await api().get("/monthly-progress?month=1990-01");
-      expect(old.status).toBe(200);
-      expect(old.body.data).toEqual([]);
+      for (const query of ["sort=due:up", "limit=1001", "owed=maybe"]) {
+        expect((await api().get(`/monthly-progress?${query}`)).status, query).toBe(400);
+      }
     });
   });
 

@@ -339,3 +339,16 @@ Exporting and importing is **symmetry, not update in place**. An import only add
 - **Inactive and foreign contractors.** A villa takes an active contractor and engineers only: an inactive one is `INVALID_VALUE` on its column. A villa's own records (open works, daily labour) name the villa's own contractor only, and an inactive one is refused too: a contractor who is not that villa's is `CONTRACTOR_NOT_ON_VILLA`. A daily report or a small work takes any active contractor. So a row exported from a record whose contractor has since been made inactive is a row error on the target until the contractor is active again.
 - **What a restored record does not keep.** It gets a new id, a creation time of the import, and the importer as its author. A villa starts with every progress at 0 and on no MEW list; the export's `Progress` is not carried over. A villas file exported before ready for inspection was removed still imports: its `Ready` and `Ready Date` columns are accepted and not read.
 - **The caps stay.** An import takes at most 2,000 data rows and an export gives at most 10,000 records. **An export of more than 2,000 rows must be split with filters** (a date range, a villa, an area) into files of at most 2,000 rows, each imported on its own; the files are imported one after the other, and the same file is never imported twice (`FILE_ALREADY_IMPORTED`).
+
+## Previous payments import
+
+`POST /progress-payments/import` (template: `GET /progress-payments/import/template`, sheet `Previous payments`) enters payments made to the villas' contractors before the system, one row each, like a payment entered by hand on the villa page. It follows the rules of every import above (dry run, report, file hash, `Idempotency-Key`).
+
+| Field            | Required | Notes                                                                                                        |
+| ---------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| `Villa Number`   | Yes      | As it is in the system; the villa needs a Work Order Value.                                                  |
+| `Paid On`        | Yes      | YYYY-MM-DD or a date cell, not after today.                                                                  |
+| `Paid Up To (%)` | Yes      | 0.1 to 100, one decimal. For each villa it must rise with the date, against the payments already stored too. |
+| `Amount (KWD)`   | Yes      | More than 0, at most three decimals.                                                                         |
+| `Contractor`     | No       | As in the Contractors list; empty: the villa's contractor.                                                   |
+| `Note`           | No       | At most 2000 characters.                                                                                     |

@@ -93,6 +93,12 @@ export const PERMISSIONS = {
   OWNER_NOTES_CREATE: "owner-notes:create",
   OWNER_NOTES_UPDATE: "owner-notes:update",
   OWNER_NOTES_DELETE: "owner-notes:delete",
+  // Department overhead: the employees the department pays and their monthly salaries. Kept apart from every other
+  // permission because salaries are sensitive.
+  OVERHEAD_READ: "overhead:read",
+  OVERHEAD_CREATE: "overhead:create",
+  OVERHEAD_UPDATE: "overhead:update",
+  OVERHEAD_DELETE: "overhead:delete",
   // Foreman missions: the list (open and done) and one note are :read, and :read also receives the daily reminders.
   // Checking one as done is :update.
   FOREMAN_MISSIONS_READ: "foreman-missions:read",

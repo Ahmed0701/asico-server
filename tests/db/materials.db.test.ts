@@ -68,6 +68,8 @@ describe.skipIf(!RUN)("materials on a real database (scratch schema)", () => {
       factoryId: "sw",
       noteNumber: "DN-1",
       deliveryDate: new Date("2026-10-20"),
+      mrDate: null,
+      poDate: null,
       lines: [
         { itemId: await item("MSB Box"), quantity: 1 },
         { itemId: await item("DB Interior"), quantity: 1.5 },
@@ -78,6 +80,8 @@ describe.skipIf(!RUN)("materials on a real database (scratch schema)", () => {
       factoryId: "sw",
       noteNumber: "DN-2",
       deliveryDate: new Date("2026-10-21"),
+      mrDate: null,
+      poDate: null,
       lines: [{ itemId: await item("DB Interior"), quantity: 2 }],
     });
   }, 120_000);

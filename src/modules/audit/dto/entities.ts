@@ -26,6 +26,9 @@ export const ENTITY_LABEL_KEYS = {
   Factory: "entities.Factory",
   MaterialDelivery: "entities.MaterialDelivery",
   MaterialItem: "entities.MaterialItem",
+  OverheadEmployee: "entities.OverheadEmployee",
+  OverheadExpense: "entities.OverheadExpense",
+  ProgressPayment: "entities.ProgressPayment",
   AuditLog: "entities.AuditLog",
 } as const satisfies Record<string, MessageKey>;
 
@@ -91,6 +94,9 @@ export const NAME_FIELD: Record<AuditEntity, string | undefined> = {
   Factory: "name",
   MaterialDelivery: "noteNumber",
   MaterialItem: "name",
+  OverheadEmployee: "name",
+  OverheadExpense: "description",
+  ProgressPayment: "villaNumber",
   AuditLog: undefined,
 };
 

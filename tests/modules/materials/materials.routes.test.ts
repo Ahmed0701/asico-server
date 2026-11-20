@@ -363,6 +363,42 @@ describe("deliveries", () => {
     expect(removed.status).toBe(204);
   });
 
+  it("keeps the MR and PO dates of a delivery: optional, changed and cleared on an edit, and checked", async () => {
+    const { villa, switchgear, msbBox } = seed();
+
+    const plain = await send("post", "/material-deliveries", {
+      villaId: villa.id,
+      factoryId: switchgear.id,
+      lines: one(msbBox.id),
+      deliveryDate: "2026-10-20",
+    });
+    expect(plain.body.data).toMatchObject({ mrDate: null, poDate: null });
+
+    const created = await send("post", "/material-deliveries", {
+      villaId: villa.id,
+      factoryId: switchgear.id,
+      lines: one(msbBox.id),
+      deliveryDate: "2026-10-20",
+      mrDate: "2026-10-01",
+      poDate: "2026-10-05",
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.data).toMatchObject({ mrDate: "2026-10-01", poDate: "2026-10-05" });
+
+    const id = created.body.data.id as string;
+    const edited = await send("patch", `/material-deliveries/${id}`, { poDate: "2026-10-07", mrDate: null });
+    expect(edited.body.data).toMatchObject({
+      mrDate: null,
+      poDate: "2026-10-07",
+      deliveryDate: "2026-10-20",
+    });
+
+    for (const bad of ["2026-02-30", "07/10/2026", 20261007]) {
+      const res = await send("patch", `/material-deliveries/${id}`, { mrDate: bad });
+      expect(res.status, String(bad)).toBe(400);
+    }
+  });
+
   it("keeps a villa that has deliveries from being deleted", async () => {
     const { villa, switchgear, msbBox } = seed();
     addDelivery({ villaId: villa.id, factoryId: switchgear.id, lines: one(msbBox.id) });

@@ -115,66 +115,83 @@ See [write-safety.md](write-safety.md).
 
 ### Villas and their records
 
-| Code                                  | Status | When                                                                                                                                |
-| ------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `VILLA_NOT_FOUND`                     | 404    | No such villa (also: a record pointing at one).                                                                                     |
-| `VILLA_NUMBER_TAKEN`                  | 409    | Another villa has this number.                                                                                                      |
-| `VILLA_PLOT_TAKEN`                    | 409    | Another villa is on this area, block and plot.                                                                                      |
-| `VILLA_HAS_RECORDS`                   | 409    | The villa has open works added by hand, small works, site reports or labour: delete them first. (Daily reports belong to no villa.) |
-| `VILLA_ALREADY_MEW_FOLLOW_UP`         | 409    | Putting a villa on MEW follow up that is already on it.                                                                             |
-| `VILLA_NOT_MEW_FOLLOW_UP`             | 409    | Taking a villa off MEW follow up that is not on it.                                                                                 |
-| `VILLA_ALREADY_MEW_INSPECTION`        | 409    | Putting a villa on MEW inspection that is already on it.                                                                            |
-| `VILLA_MEW_NOT_APPROVED`              | 409    | Putting a villa on MEW inspection while its MEW AC state or MEW electricity state is not `APPROVED`.                                |
-| `VILLA_VARIATION_ORDERS_PENDING`      | 409    | Putting a villa on MEW inspection while one of its variation orders is still `PENDING`. `details[0].value` is how many.             |
-| `VILLA_NOT_MEW_INSPECTION`            | 409    | Taking a villa off MEW inspection that is not on it.                                                                                |
-| `VILLA_ALREADY_MEW_INSPECTION_PASSED` | 409    | Checking a villa as passed MEW inspection when it already is.                                                                       |
-| `VILLA_NOT_MEW_INSPECTION_PASSED`     | 409    | Taking back a passed MEW inspection that the villa does not have.                                                                   |
-| `CONTRACTOR_NOT_ON_VILLA`             | 422    | An open work or a labour row names a contractor who is not the villa's contractor.                                                  |
-| `WORK_ITEM_NOT_FOUND`                 | 404    | No such open work.                                                                                                                  |
-| `OPEN_WORK_PHASE_TAKEN`               | 409    | The villa already has an open work for this electrical phase (a villa has one per phase): edit that one instead.                    |
-| `WORK_STATUS_PROGRESS_MISMATCH`       | 422    | A status and a progress that disagree (DONE needs 100, NOT_STARTED needs 0, and so on).                                             |
-| `DAILY_REPORT_NOT_FOUND`              | 404    | No such daily report.                                                                                                               |
-| `DAILY_REPORT_EXISTS`                 | 409    | The contractor already has a daily report for that date.                                                                            |
-| `SMALL_WORK_NOT_FOUND`                | 404    | No such small work.                                                                                                                 |
-| `SMALL_WORK_DATE_RANGE_INVALID`       | 422    | The end date of a small work is before its start date.                                                                              |
-| `NOTIFICATION_NOT_FOUND`              | 404    | No such notification for the caller (someone else's counts as missing).                                                             |
-| `SITE_REPORT_NOT_FOUND`               | 404    | No such site report.                                                                                                                |
-| `DAILY_LABOUR_NOT_FOUND`              | 404    | No such labour row.                                                                                                                 |
-| `DAILY_LABOUR_EXISTS`                 | 409    | The villa already has a labour row for that contractor and date.                                                                    |
-| `FACTORY_NOT_FOUND`                   | 404    | No such factory (also: a delivery pointing at one).                                                                                 |
-| `FACTORY_TAKEN`                       | 409    | A factory of the same type already has this name (ignoring case).                                                                   |
-| `FACTORY_HAS_DELIVERIES`              | 409    | Deleting a factory that has deliveries.                                                                                             |
-| `MATERIAL_ITEM_NOT_FOUND`             | 404    | No such catalog material (also: a delivery line or a villa requirement pointing at one).                                            |
-| `MATERIAL_ITEM_TAKEN`                 | 409    | The catalog already has a material of the same type with this name (ignoring case).                                                 |
-| `MATERIAL_ITEM_IN_USE`                | 409    | Deleting a catalog material that a delivery has, or moving it to the other type.                                                    |
-| `MATERIAL_ITEM_WRONG_TYPE`            | 422    | A delivery line whose material is not of the delivery's factory type.                                                               |
-| `DELIVERY_NOT_FOUND`                  | 404    | No such material delivery.                                                                                                          |
-| `DELIVERY_NOTE_LIMIT`                 | 409    | Adding delivery note files beyond the 10 a delivery can have.                                                                       |
-| `DELIVERY_NOTE_NOT_FOUND`             | 404    | Opening or removing the delivery note of a delivery that has none.                                                                  |
-| `MAINTENANCE_NOT_FOUND`               | 404    | No such maintenance villa.                                                                                                          |
-| `OWNER_NOTE_NOT_FOUND`                | 404    | No such owner note.                                                                                                                 |
-| `FOREMAN_MISSION_NOT_FOUND`           | 404    | No such foreman mission.                                                                                                            |
-| `PAYMENT_NOT_FOUND`                   | 404    | No such payment.                                                                                                                    |
-| `PAYMENT_FILE_NOT_FOUND`              | 404    | No such file on this payment.                                                                                                       |
-| `PAYMENT_FILE_LIMIT`                  | 409    | The payment would hold more than 10 files.                                                                                          |
-| `VARIATION_ORDER_NOT_FOUND`           | 404    | No such variation order.                                                                                                            |
-| `VARIATION_ORDER_NUMBER_TAKEN`        | 409    | The villa already has a variation order with this VO number (case-insensitive).                                                     |
-| `VARIATION_ORDER_FILE_NOT_FOUND`      | 404    | No such file on this variation order.                                                                                               |
-| `VARIATION_ORDER_FILE_LIMIT`          | 409    | The variation order would hold more than 10 files.                                                                                  |
-| `MONTH_IN_FUTURE`                     | 400    | The monthly progress was asked for a month after the current one (APP_TIMEZONE).                                                    |
+| Code                                  | Status | When                                                                                                                                                      |
+| ------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VILLA_NOT_FOUND`                     | 404    | No such villa (also: a record pointing at one).                                                                                                           |
+| `VILLA_NUMBER_TAKEN`                  | 409    | Another villa has this number.                                                                                                                            |
+| `VILLA_PLOT_TAKEN`                    | 409    | Another villa is on this area, block and plot.                                                                                                            |
+| `VILLA_HAS_RECORDS`                   | 409    | The villa has open works added by hand, small works, site reports, labour, or additional expenses: delete them first. (Daily reports belong to no villa.) |
+| `VILLA_ALREADY_MEW_FOLLOW_UP`         | 409    | Putting a villa on MEW follow up that is already on it.                                                                                                   |
+| `VILLA_NOT_MEW_FOLLOW_UP`             | 409    | Taking a villa off MEW follow up that is not on it.                                                                                                       |
+| `VILLA_ALREADY_MEW_INSPECTION`        | 409    | Putting a villa on MEW inspection that is already on it.                                                                                                  |
+| `VILLA_MEW_NOT_APPROVED`              | 409    | Putting a villa on MEW inspection while its MEW AC state or MEW electricity state is not `APPROVED`.                                                      |
+| `VILLA_VARIATION_ORDERS_PENDING`      | 409    | Putting a villa on MEW inspection while one of its variation orders is still `PENDING`. `details[0].value` is how many.                                   |
+| `VILLA_NOT_MEW_INSPECTION`            | 409    | Taking a villa off MEW inspection that is not on it.                                                                                                      |
+| `VILLA_ALREADY_MEW_INSPECTION_PASSED` | 409    | Checking a villa as passed MEW inspection when it already is.                                                                                             |
+| `VILLA_NOT_MEW_INSPECTION_PASSED`     | 409    | Taking back a passed MEW inspection that the villa does not have.                                                                                         |
+| `CONTRACTOR_NOT_ON_VILLA`             | 422    | An open work or a labour row names a contractor who is not the villa's contractor.                                                                        |
+| `WORK_ITEM_NOT_FOUND`                 | 404    | No such open work.                                                                                                                                        |
+| `OPEN_WORK_PHASE_TAKEN`               | 409    | The villa already has an open work for this electrical phase (a villa has one per phase): edit that one instead.                                          |
+| `WORK_STATUS_PROGRESS_MISMATCH`       | 422    | A status and a progress that disagree (DONE needs 100, NOT_STARTED needs 0, and so on).                                                                   |
+| `DAILY_REPORT_NOT_FOUND`              | 404    | No such daily report.                                                                                                                                     |
+| `DAILY_REPORT_EXISTS`                 | 409    | The contractor already has a daily report for that date.                                                                                                  |
+| `SMALL_WORK_NOT_FOUND`                | 404    | No such small work.                                                                                                                                       |
+| `SMALL_WORK_DATE_RANGE_INVALID`       | 422    | The end date of a small work is before its start date.                                                                                                    |
+| `NOTIFICATION_NOT_FOUND`              | 404    | No such notification for the caller (someone else's counts as missing).                                                                                   |
+| `SITE_REPORT_NOT_FOUND`               | 404    | No such site report.                                                                                                                                      |
+| `DAILY_LABOUR_NOT_FOUND`              | 404    | No such labour row.                                                                                                                                       |
+| `DAILY_LABOUR_EXISTS`                 | 409    | The villa already has a labour row for that contractor and date.                                                                                          |
+| `FACTORY_NOT_FOUND`                   | 404    | No such factory (also: a delivery pointing at one).                                                                                                       |
+| `FACTORY_TAKEN`                       | 409    | A factory of the same type already has this name (ignoring case).                                                                                         |
+| `FACTORY_HAS_DELIVERIES`              | 409    | Deleting a factory that has deliveries.                                                                                                                   |
+| `FACTORY_ASSIGNED`                    | 409    | Deleting a factory, or moving it to the other type, while it is assigned to villas on the Vendors page.                                                   |
+| `FACTORY_WRONG_TYPE`                  | 422    | Assigning a cable factory as a villa's switchgear factory, or the other way round.                                                                        |
+| `VILLA_NOT_IN_VENDORS`                | 409    | Assigning factories to, or taking off, a villa that is not on the Vendors list.                                                                           |
+| `VILLA_ALREADY_IN_VENDORS`            | 409    | Adding a villa that is already on the Vendors list.                                                                                                       |
+| `MATERIAL_ITEM_NOT_FOUND`             | 404    | No such catalog material (also: a delivery line or a villa requirement pointing at one).                                                                  |
+| `MATERIAL_ITEM_TAKEN`                 | 409    | The catalog already has a material of the same type with this name (ignoring case).                                                                       |
+| `MATERIAL_ITEM_IN_USE`                | 409    | Deleting a catalog material that a delivery has, or moving it to the other type.                                                                          |
+| `MATERIAL_ITEM_WRONG_TYPE`            | 422    | A delivery line whose material is not of the delivery's factory type.                                                                                     |
+| `MATERIAL_ORDER_DATES_INVALID`        | 422    | Setting a villa's material order with a PO date before its MR date.                                                                                       |
+| `DELIVERY_NOT_FOUND`                  | 404    | No such material delivery.                                                                                                                                |
+| `DELIVERY_NOTE_LIMIT`                 | 409    | Adding delivery note files beyond the 10 a delivery can have.                                                                                             |
+| `DELIVERY_NOTE_NOT_FOUND`             | 404    | Opening or removing the delivery note of a delivery that has none.                                                                                        |
+| `MAINTENANCE_NOT_FOUND`               | 404    | No such maintenance villa.                                                                                                                                |
+| `OWNER_NOTE_NOT_FOUND`                | 404    | No such owner note.                                                                                                                                       |
+| `OVERHEAD_EMPLOYEE_NOT_FOUND`         | 404    | No such overhead employee.                                                                                                                                |
+| `OVERHEAD_EXPENSE_NOT_FOUND`          | 404    | No such additional expense.                                                                                                                               |
+| `OVERHEAD_EXPENSE_FILE_NOT_FOUND`     | 404    | No such file on this expense.                                                                                                                             |
+| `OVERHEAD_EXPENSE_FILE_LIMIT`         | 409    | The expense would hold more than 10 files.                                                                                                                |
+| `SALARY_SHARE_OVER_LIMIT`             | 422    | Saving a villa's salary share that would take the shares of all villas over 100%. The message says how much is left.                                      |
+| `FOREMAN_MISSION_NOT_FOUND`           | 404    | No such foreman mission.                                                                                                                                  |
+| `PAYMENT_NOT_FOUND`                   | 404    | No such payment.                                                                                                                                          |
+| `PAYMENT_FILE_NOT_FOUND`              | 404    | No such file on this payment.                                                                                                                             |
+| `PAYMENT_FILE_LIMIT`                  | 409    | The payment would hold more than 10 files.                                                                                                                |
+| `VARIATION_ORDER_NOT_FOUND`           | 404    | No such variation order.                                                                                                                                  |
+| `VARIATION_ORDER_NUMBER_TAKEN`        | 409    | The villa already has a variation order with this VO number (case-insensitive).                                                                           |
+| `VARIATION_ORDER_FILE_NOT_FOUND`      | 404    | No such file on this variation order.                                                                                                                     |
+| `VARIATION_ORDER_FILE_LIMIT`          | 409    | The variation order would hold more than 10 files.                                                                                                        |
+| `NOTHING_TO_PAY`                      | 409    | Paying a villa whose progress has not moved since its last payment.                                                                                       |
+| `PAID_DATE_IN_FUTURE`                 | 422    | Entering a payment made before the system with a date after today.                                                                                        |
+| `PAID_RATIO_OUT_OF_ORDER`             | 409    | Entering a payment made before the system whose paid up to ratio is not more than the payment before it by date, or not less than the one after it.       |
+| `WORK_ORDER_MISSING`                  | 422    | Paying a villa that has no Work Order Value on its Villa Budget.                                                                                          |
+| `PROGRESS_PAYMENT_NOT_FOUND`          | 404    | No such progress payment.                                                                                                                                 |
+| `PROGRESS_PAYMENT_NOT_LATEST`         | 409    | Taking back a payment recorded by the system that is not the villa's latest (one entered by hand can be removed at any time).                             |
 
 ### Documents
 
-| Code                   | Status | When                                                                          |
-| ---------------------- | ------ | ----------------------------------------------------------------------------- |
-| `FILE_NOT_FOUND`       | 404    | No such document, or the file is missing from storage.                        |
-| `FILE_LINK_INVALID`    | 401    | A signed file link that has expired, was changed, or is for another document. |
-| `NO_FILE_PROVIDED`     | 400    | An upload or an import without a file in the `file` field.                    |
-| `TOO_MANY_FILES`       | 400    | More than one file in one request.                                            |
-| `INVALID_FILE_TYPE`    | 400    | Not a PDF (decided by the file's first bytes, not its name).                  |
-| `FILE_TOO_LARGE`       | 413    | The file is over `MAX_UPLOAD_BYTES` (a document), or over 5 MB (an import).   |
-| `VILLA_DOCUMENT_LIMIT` | 409    | The villa already holds `MAX_DOCUMENTS_PER_VILLA` documents.                  |
-| `AUDIT_LOG_NOT_FOUND`  | 404    | No such audit entry.                                                          |
+| Code                    | Status | When                                                                          |
+| ----------------------- | ------ | ----------------------------------------------------------------------------- |
+| `FILE_NOT_FOUND`        | 404    | No such document, or the file is missing from storage.                        |
+| `FILE_LINK_INVALID`     | 401    | A signed file link that has expired, was changed, or is for another document. |
+| `NO_FILE_PROVIDED`      | 400    | An upload or an import without a file in the `file` field.                    |
+| `TOO_MANY_FILES`        | 400    | More than one file in one request.                                            |
+| `INVALID_FILE_TYPE`     | 400    | Not a PDF (decided by the file's first bytes, not its name).                  |
+| `FILE_TOO_LARGE`        | 413    | The file is over `MAX_UPLOAD_BYTES` (a document), or over 5 MB (an import).   |
+| `VILLA_DOCUMENT_LIMIT`  | 409    | The villa already holds `MAX_DOCUMENTS_PER_VILLA` documents.                  |
+| `VILLA_IMAGE_NOT_FOUND` | 404    | No such site image.                                                           |
+| `VILLA_IMAGE_LIMIT`     | 409    | The villa would hold more than 200 site images.                               |
+| `AUDIT_LOG_NOT_FOUND`   | 404    | No such audit entry.                                                          |
 
 ### Exports and imports
 

@@ -75,6 +75,8 @@ export const envSchema = z
     DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
     DB_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+    // Server processes to run (dist/cluster.js): 1 is a single process, 0 one per CPU core.
+    WEB_CONCURRENCY: z.coerce.number().int().min(0).max(32).default(1),
     // The time zone the deadline of a small work is counted in (the end of its endDate day). Nothing else uses it: "today"
     // everywhere else is the UTC day.
     APP_TIMEZONE: z.preprocess(

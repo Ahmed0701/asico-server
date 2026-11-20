@@ -50,6 +50,8 @@ const ownerNotes = vi.fn<(args: unknown) => Promise<number>>();
 const foremanMissions = vi.fn<(args: unknown) => Promise<number>>();
 const payments = vi.fn<(args: unknown) => Promise<number>>();
 const variationOrders = vi.fn<(args: unknown) => Promise<number>>();
+const expenses = vi.fn<(args: unknown) => Promise<number>>();
+const progressPayments = vi.fn<(args: unknown) => Promise<number>>();
 const tx = {
   marker: "tx",
   workItem: { count: manualItems },
@@ -62,6 +64,8 @@ const tx = {
   foremanMission: { count: foremanMissions },
   contractorPayment: { count: payments },
   variationOrder: { count: variationOrders },
+  overheadExpense: { count: expenses },
+  progressPayment: { count: progressPayments },
 } as unknown as Db;
 
 const ENG = "11111111-1111-4111-8111-111111111111";
@@ -194,6 +198,10 @@ beforeEach(() => {
   payments.mockResolvedValue(0);
   variationOrders.mockReset();
   variationOrders.mockResolvedValue(0);
+  expenses.mockReset();
+  expenses.mockResolvedValue(0);
+  progressPayments.mockReset();
+  progressPayments.mockResolvedValue(0);
   repo = makeRepo();
   repo.lockVersion.mockResolvedValue(1);
   repo.updateScalars.mockResolvedValue(true);
@@ -1516,6 +1524,8 @@ describe("remove", () => {
       foremanMissions.mockImplementation(async () => (order.push("foreman missions"), 0));
       payments.mockImplementation(async () => (order.push("payments"), 0));
       variationOrders.mockImplementation(async () => (order.push("variation orders"), 0));
+      expenses.mockImplementation(async () => (order.push("additional expenses"), 0));
+      progressPayments.mockImplementation(async () => (order.push("progress payments"), 0));
       repo.delete.mockImplementation(async () => (order.push("delete"), true));
 
       await service.remove(actor, "villa-1", ctx);
@@ -1538,8 +1548,22 @@ describe("remove", () => {
         "foreman missions",
         "payments",
         "variation orders",
+        "additional expenses",
+        "progress payments",
         "delete",
       ]);
+    });
+
+    it("is refused with 409 VILLA_HAS_RECORDS when it has an additional expense: nothing is deleted", async () => {
+      repo.findSnapshot.mockResolvedValue(snapshotRow());
+      expenses.mockResolvedValue(1);
+
+      expect(await failure(service.remove(actor, "villa-1", ctx))).toMatchObject({
+        statusCode: 409,
+        code: "VILLA_HAS_RECORDS",
+      });
+      expect(expenses).toHaveBeenCalledWith({ where: { villaId: "villa-1" } });
+      expect(repo.delete).not.toHaveBeenCalled();
     });
 
     it("is refused with 409 VILLA_HAS_RECORDS when it has an owner note: nothing is deleted", async () => {

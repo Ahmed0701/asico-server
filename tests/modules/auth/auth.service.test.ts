@@ -689,7 +689,7 @@ describe("getMe and updateMe", () => {
     const me = await service.getMe("user-1", ctx);
 
     expect(me.permissions).toEqual([...PERMISSION_CODES]);
-    expect(me.permissions).toHaveLength(92);
+    expect(me.permissions).toHaveLength(96);
     expect(repo.getPermissionCodes).not.toHaveBeenCalled();
     expect(me).not.toHaveProperty("passwordHash");
   });

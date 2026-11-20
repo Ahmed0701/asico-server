@@ -1,5 +1,5 @@
 # Production image of the API. Built by deploy/docker-compose.prod.yml (service "app").
-#   Run:      node dist/server.js                       (the default command)
+#   Run:      node dist/cluster.js                      (the default command; WEB_CONCURRENCY server processes)
 #   Migrate:  npx prisma migrate deploy                 (deploy/scripts/first-run.sh, update.sh)
 #   Seed:     node dist/cli/seed.js                     (permissions + the first admin; no tsx at runtime)
 ARG NODE_IMAGE=node:22-bookworm-slim
@@ -49,4 +49,4 @@ USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/api/v1/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/cluster.js"]

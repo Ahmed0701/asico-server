@@ -42,6 +42,8 @@ export type StoredDelivery = {
   lines: StoredLine[];
   noteNumber: string | null;
   deliveryDate: Date;
+  mrDate: Date | null;
+  poDate: Date | null;
   notes: StoredNote[];
   version: number;
   createdAt: Date;

@@ -67,6 +67,13 @@ health and prints the deployed commit. Frontend: run `/opt/asico/deploy-frontend
 Rollback: `git checkout <good commit>` and `./scripts/update.sh`. A migration that dropped or changed columns is not
 undone by the old image; restore the backup taken at the start of the update first.
 
+## Server processes
+
+The app container runs `WEB_CONCURRENCY` server processes (`.env.production`, 4 in the example) sharing port 8080, so a
+busy server uses several cores: 4 processes handled 250 users at once within the 1.5 s target in the load check, where one
+did not. Set it to the number of CPU cores of the server (or 0 for exactly that) and keep `WEB_CONCURRENCY × DB_POOL_MAX`
+under 100, PostgreSQL's connection limit. A change takes effect on `docker compose up -d app`.
+
 ## Backup
 
 ```bash
@@ -78,6 +85,17 @@ Each run writes `daily/db_<stamp>.dump` (pg_dump custom format, checked with `pg
 `daily/documents_<stamp>.tar.gz` (the documents volume, checked with `gzip -t`), links `latest-db.dump` and
 `latest-documents.tar.gz`, keeps a weekly copy on Sundays, and prunes to 14 daily and 8 weekly. It exits non-zero on any
 failure. Copy the latest files off the server at least weekly: `scp deploy@SERVER_IP:/opt/asico/backups/latest-db.dump .`
+
+Two optional settings in `.env.production` make this automatic and safer:
+
+- `BACKUP_OFFSITE`: an rsync destination over SSH keys (for example `backup@backup-host:/srv/asico-backups`). Every run
+  copies the new database dump and documents archive there, and the weekly copies on Sundays. Nothing is deleted at the
+  destination, so prune it there.
+- `BACKUP_GPG_RECIPIENT`: a gpg public key (import it as the `deploy` user with `gpg --import`). Every file is
+  encrypted for it (`.dump.gpg`, `.tar.gz.gpg`) and the plain copy removed; keep the private key off the server. To
+  restore, decrypt first: `gpg --output db.dump --decrypt db_<stamp>.dump.gpg`, then use `restore.sh` as below.
+
+Test a restore into a new database every month (below): a backup that was never restored is not known to work.
 
 ## Restore
 

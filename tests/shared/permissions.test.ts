@@ -71,6 +71,10 @@ const EXPECTED_CODES = [
   "owner-notes:create",
   "owner-notes:update",
   "owner-notes:delete",
+  "overhead:read",
+  "overhead:create",
+  "overhead:update",
+  "overhead:delete",
   "foreman-missions:read",
   "foreman-missions:create",
   "foreman-missions:update",
@@ -99,7 +103,7 @@ const EXPECTED_CODES = [
 describe("permission codes", () => {
   it("are exactly the approved list", () => {
     expect([...PERMISSION_CODES].sort()).toEqual([...EXPECTED_CODES].sort());
-    expect(PERMISSION_CODES).toHaveLength(92);
+    expect(PERMISSION_CODES).toHaveLength(96);
   });
 
   it("are unique and shaped resource:action", () => {

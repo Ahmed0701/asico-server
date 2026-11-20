@@ -87,6 +87,20 @@ describe("migration order", () => {
       "open_work_progress_updated",
       "variation_order_number_ci",
       "work_item_villa_phase_index",
+      "villa_finance",
+      "department_overhead",
+      "overhead_role",
+      "villa_salary_share",
+      "overhead_expenses",
+      "overhead_expense_files",
+      "material_delivery_mr_po_dates",
+      "villa_vendors",
+      "villa_vendors_list",
+      "villa_images",
+      "progress_payments",
+      "progress_payment_manual",
+      "villa_material_orders",
+      "rate_limit_hits",
     ]);
   });
 

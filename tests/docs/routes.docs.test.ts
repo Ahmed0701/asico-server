@@ -102,6 +102,7 @@ describe("docs/api.md", async () => {
         "material-deliveries",
         "open-works",
         "payments",
+        "progress-payments",
         "site-reports",
         "small-works",
         "villas",

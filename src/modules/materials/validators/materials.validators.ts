@@ -130,6 +130,9 @@ export const createDeliverySchema = z.strictObject({
   lines,
   noteNumber: noteNumber.nullable().optional(),
   deliveryDate: calendarDateField,
+  // The material request and purchase order dates: optional, null clears one.
+  mrDate: calendarDateField.nullable().optional(),
+  poDate: calendarDateField.nullable().optional(),
 });
 
 // `lines`, when given, replaces all the lines of the delivery.
@@ -140,6 +143,8 @@ export const updateDeliverySchema = z
     lines: lines.optional(),
     noteNumber: noteNumber.nullable().optional(),
     deliveryDate: calendarDateField.optional(),
+    mrDate: calendarDateField.nullable().optional(),
+    poDate: calendarDateField.nullable().optional(),
   })
   .refine(hasAnyField, { error: "validation.atLeastOneField" });
 

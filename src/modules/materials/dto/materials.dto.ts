@@ -44,7 +44,8 @@ export type DeliveryLineDto = {
 };
 
 // A delivery from a factory to a villa: its lines in catalog order, and its delivery note files (oldest first, empty until
-// one is uploaded). `deliveryDate` is YYYY-MM-DD.
+// one is uploaded). `deliveryDate`, `mrDate` (material request) and `poDate` (purchase order) are YYYY-MM-DD; the last two
+// are null when not known.
 export type MaterialDeliveryDto = {
   id: string;
   villa: { id: string; villaNumber: string };
@@ -52,6 +53,8 @@ export type MaterialDeliveryDto = {
   lines: DeliveryLineDto[];
   noteNumber: string | null;
   deliveryDate: string;
+  mrDate: string | null;
+  poDate: string | null;
   deliveryNotes: DeliveryNoteDto[];
   version: number;
   createdAt: string;

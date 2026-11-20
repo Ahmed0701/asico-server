@@ -18,8 +18,12 @@ import {
 const controller = new AuthController();
 
 // One limiter per route, so each endpoint has its own counter per client.
-const limited = () =>
-  createRateLimiter({ windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS, limit: env.AUTH_RATE_LIMIT_MAX });
+const limited = (route: string) =>
+  createRateLimiter({
+    name: `auth-${route}`,
+    windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
+    limit: env.AUTH_RATE_LIMIT_MAX,
+  });
 
 // With public sign-up closed (production by default), only an administrator creates users, through POST /users. Checked
 // before the body is read, so a closed sign-up answers the same whatever is sent.
@@ -33,17 +37,22 @@ function signupOpen(req: Request, _res: Response, next: NextFunction): void {
 
 export const authRouter = Router();
 
-authRouter.post("/auth/signup", limited(), signupOpen, validate(signupSchema), controller.signup);
-authRouter.post("/auth/login", limited(), validate(loginSchema), controller.login);
+authRouter.post("/auth/signup", limited("signup"), signupOpen, validate(signupSchema), controller.signup);
+authRouter.post("/auth/login", limited("login"), validate(loginSchema), controller.login);
 authRouter.post("/auth/refresh", refreshRateLimiter, controller.refresh);
 authRouter.post("/auth/logout", controller.logout);
 authRouter.post(
   "/auth/forgot-password",
-  limited(),
+  limited("forgot-password"),
   validate(forgotPasswordSchema),
   controller.forgotPassword,
 );
-authRouter.post("/auth/reset-password", limited(), validate(resetPasswordSchema), controller.resetPassword);
+authRouter.post(
+  "/auth/reset-password",
+  limited("reset-password"),
+  validate(resetPasswordSchema),
+  controller.resetPassword,
+);
 authRouter.post("/auth/change-password", auth, validate(changePasswordSchema), controller.changePassword);
 
 authRouter.get("/me", auth, controller.getMe);

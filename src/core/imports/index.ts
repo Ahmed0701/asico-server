@@ -2,6 +2,7 @@ export { ImportBatchRepository, type Db } from "./repository.js";
 export {
   IMPORT_TRANSACTION_TIMEOUT_MS,
   ImportRunner,
+  type CheckedRow,
   type ImportDefinition,
   type ImportInput,
   type ImportOutcome,

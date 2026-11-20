@@ -180,6 +180,8 @@ export class DeliveriesService {
           factoryId: input.factoryId,
           noteNumber: input.noteNumber ?? null,
           deliveryDate: input.deliveryDate,
+          mrDate: input.mrDate ?? null,
+          poDate: input.poDate ?? null,
           lines: input.lines,
         },
         tx,
@@ -226,6 +228,8 @@ export class DeliveriesService {
           ...(input.factoryId !== undefined && { factoryId: input.factoryId }),
           ...(input.noteNumber !== undefined && { noteNumber: input.noteNumber }),
           ...(input.deliveryDate !== undefined && { deliveryDate: input.deliveryDate }),
+          ...(input.mrDate !== undefined && { mrDate: input.mrDate }),
+          ...(input.poDate !== undefined && { poDate: input.poDate }),
         };
         const updated = await this.repository.update(id, target.version, data, input.lines, tx);
         if (!updated) {

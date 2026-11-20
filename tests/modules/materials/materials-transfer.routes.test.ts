@@ -40,7 +40,9 @@ import { signAccessToken } from "../../../src/core/security/jwt.js";
 import type { User } from "../../../src/generated/prisma/client.js";
 
 const app = createApp();
+// The columns of a file made before the MR and PO dates: still imported.
 const HEADER = ["Villa Number", "Factory", "Material", "Quantity", "Delivery Date", "Delivery Note No."];
+const FULL_HEADER = [...HEADER, "MR Date", "PO Date"];
 
 let admin: User;
 beforeEach(() => {
@@ -145,6 +147,7 @@ describe("GET /material-deliveries/export", () => {
       factoryId: gulf.id,
       noteNumber: "DN-7",
       deliveryDate: new Date("2026-11-01T00:00:00.000Z"),
+      mrDate: new Date("2026-10-15T00:00:00.000Z"),
       lines: [
         { itemId: msb.id, quantity: 1 },
         { itemId: db.id, quantity: 2.5 },
@@ -161,7 +164,7 @@ describe("GET /material-deliveries/export", () => {
       /^attachment; filename="elecico-material-deliveries-\d{4}-\d{2}-\d{2}\.xlsx"$/,
     );
     expect(Object.keys(rows[0]!)).toEqual([
-      ...HEADER,
+      ...FULL_HEADER,
       "Type",
       "Unit",
       "Delivery Note Files",
@@ -181,6 +184,9 @@ describe("GET /material-deliveries/export", () => {
       ["V-101", "DB Interior", 2.5, "Switchgears", "pcs", "dn7.pdf"],
     ]);
     expect(rows[0]!["Delivery Date"]).toEqual(new Date("2026-11-01T00:00:00.000Z"));
+    expect(rows[0]!["MR Date"]).toEqual(new Date("2026-10-15T00:00:00.000Z"));
+    // A date not known is an empty cell.
+    expect(rows[0]!["PO Date"] ?? null).toBeNull();
     expect(auditActions()).toEqual(["export.material-deliveries"]);
   });
 
@@ -226,7 +232,7 @@ describe("GET /material-balance/export", () => {
 });
 
 describe("the import", () => {
-  it("offers a template with the six columns", async () => {
+  it("offers a template with the eight columns", async () => {
     seed();
     const res = await download("/material-deliveries/import/template");
     const workbook = new ExcelJS.Workbook();
@@ -235,7 +241,31 @@ describe("the import", () => {
     expect(res.headers["content-disposition"]).toBe(
       'attachment; filename="material-deliveries-import-template.xlsx"',
     );
-    expect((workbook.worksheets[0]!.getRow(1).values as string[]).slice(1)).toEqual(HEADER);
+    expect((workbook.worksheets[0]!.getRow(1).values as string[]).slice(1)).toEqual(FULL_HEADER);
+  });
+
+  it("reads the MR and PO dates of a delivery, from the first of its rows that gives them, and refuses a bad one", async () => {
+    seed();
+    const file = await workbookOf([
+      FULL_HEADER,
+      ["V-101", "Gulf Switchgear", "MSB Box", 1, "2026-11-05", "DN-9", null, null],
+      ["V-101", "Gulf Switchgear", "DB Interior", 2, "2026-11-05", "DN-9", "2026-10-20", "2026-10-25"],
+    ]);
+    const res = await upload(file);
+    expect(res.status).toBe(201);
+    expect(materialTables.deliveries).toHaveLength(1);
+    const delivery = materialTables.deliveries[0]!;
+    expect(delivery.mrDate).toEqual(new Date("2026-10-20T00:00:00.000Z"));
+    expect(delivery.poDate).toEqual(new Date("2026-10-25T00:00:00.000Z"));
+
+    const bad = await upload(
+      await workbookOf([
+        FULL_HEADER,
+        ["V-101", "Gulf Switchgear", "MSB Box", 1, "2026-11-05", "DN-10", "2026-02-30", null],
+      ]),
+    );
+    expect(bad.body.data.ok).toBe(false);
+    expect(materialTables.deliveries).toHaveLength(1);
   });
 
   it("makes one delivery of the rows with the same villa, factory, date and note number, and adds up a material twice", async () => {

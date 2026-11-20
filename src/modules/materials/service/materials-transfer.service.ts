@@ -59,6 +59,8 @@ export const MATERIAL_TITLES = {
   quantity: "Quantity",
   deliveryDate: "Delivery Date",
   noteNumber: "Delivery Note No.",
+  mrDate: "MR Date",
+  poDate: "PO Date",
   type: "Type",
   unit: "Unit",
   noteFiles: "Delivery Note Files",
@@ -81,6 +83,8 @@ const DELIVERY_COLUMNS: ExportColumn[] = [
   { key: T.quantity, title: T.quantity, kind: "decimal" },
   { key: T.deliveryDate, title: T.deliveryDate, kind: "date" },
   { key: T.noteNumber, title: T.noteNumber, kind: "text" },
+  { key: T.mrDate, title: T.mrDate, kind: "date" },
+  { key: T.poDate, title: T.poDate, kind: "date" },
   { key: T.type, title: T.type, kind: "text" },
   { key: T.unit, title: T.unit, kind: "text" },
   { key: T.noteFiles, title: T.noteFiles, kind: "text" },
@@ -90,6 +94,8 @@ const DELIVERY_COLUMNS: ExportColumn[] = [
 // The PDF reads like a delivery register: the date first.
 const DELIVERY_PDF_COLUMNS: ExportColumn[] = [
   { key: T.deliveryDate, title: T.deliveryDate, kind: "date" },
+  { key: T.mrDate, title: T.mrDate, kind: "date" },
+  { key: T.poDate, title: T.poDate, kind: "date" },
   { key: T.villaNumber, title: T.villaNumber, kind: "text" },
   { key: T.type, title: T.type, kind: "text" },
   { key: T.factory, title: T.factory, kind: "text" },
@@ -109,6 +115,8 @@ function deliveryRows(item: MaterialDeliveryDto): ExportRow[] {
     [T.quantity]: line.quantity,
     [T.deliveryDate]: asDay(item.deliveryDate),
     [T.noteNumber]: item.noteNumber ?? "",
+    [T.mrDate]: item.mrDate ? asDay(item.mrDate) : null,
+    [T.poDate]: item.poDate ? asDay(item.poDate) : null,
     [T.type]: TYPE_LABELS[item.factory.type],
     [T.unit]: line.item.unit,
     [T.noteFiles]: files || "None",
@@ -210,6 +218,24 @@ export const MATERIAL_IMPORT_COLUMNS = [
       "The delivery note number. Rows with the same villa, factory, date and note number are one delivery with several materials.",
     example: "DN-1024",
   },
+  {
+    header: T.mrDate,
+    kind: "date",
+    required: false,
+    // Files made before these columns existed are still read.
+    optionalHeader: true,
+    description: "The day of the material request (MR), written YYYY-MM-DD, or a date cell.",
+    example: "2026-10-20",
+  },
+  {
+    header: T.poDate,
+    kind: "date",
+    required: false,
+    // Files made before these columns existed are still read.
+    optionalHeader: true,
+    description: "The day of the purchase order (PO), written YYYY-MM-DD, or a date cell.",
+    example: "2026-10-25",
+  },
 ] as const satisfies readonly ImportColumn[];
 
 // What the workbook adds after those columns. A file that carries them is imported as it is: they are not read.
@@ -234,6 +260,8 @@ export type MaterialRowInput = {
   quantity: number;
   deliveryDate: Date;
   noteNumber: string | null;
+  mrDate: Date | null;
+  poDate: Date | null;
 };
 
 export type MaterialLookups = {
@@ -286,6 +314,8 @@ export function parseMaterialRow(
   );
   const deliveryDate = take(T.deliveryDate, dateCell(cell(T.deliveryDate), { required: true }));
   const note = take(T.noteNumber, textCell(cell(T.noteNumber), noteNumber, { required: false }));
+  const mrDate = take(T.mrDate, dateCell(cell(T.mrDate), { required: false }));
+  const poDate = take(T.poDate, dateCell(cell(T.poDate), { required: false }));
 
   const villa = resolveVilla(parser.issues, lookups.villas, T.villaNumber, villaText, cell(T.villaNumber));
 
@@ -337,6 +367,8 @@ export function parseMaterialRow(
       quantity,
       deliveryDate,
       noteNumber: note && note.length > 0 ? note : null,
+      mrDate: mrDate ?? null,
+      poDate: poDate ?? null,
     },
     issues: [],
   };
@@ -361,9 +393,14 @@ export function groupDeliveries(rows: readonly MaterialRowInput[]) {
       factoryId: row.factoryId,
       deliveryDate: row.deliveryDate,
       noteNumber: row.noteNumber,
+      mrDate: row.mrDate,
+      poDate: row.poDate,
       lines: new Map<string, number>(),
       rows: 0,
     };
+    // A delivery's MR and PO dates are those of the first of its rows that gives them.
+    group.mrDate ??= row.mrDate;
+    group.poDate ??= row.poDate;
     group.rows += 1;
     group.lines.set(row.itemId, Math.round(((group.lines.get(row.itemId) ?? 0) + row.quantity) * 100) / 100);
     groups.set(key, group);
@@ -373,6 +410,8 @@ export function groupDeliveries(rows: readonly MaterialRowInput[]) {
     factoryId: group.factoryId,
     deliveryDate: group.deliveryDate,
     noteNumber: group.noteNumber,
+    mrDate: group.mrDate,
+    poDate: group.poDate,
     lines: [...group.lines].map(([itemId, quantity]) => ({ itemId, quantity })),
     rows: group.rows,
   }));

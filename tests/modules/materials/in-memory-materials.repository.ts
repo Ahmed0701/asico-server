@@ -111,6 +111,8 @@ export function addDelivery(
     id: randomUUID(),
     noteNumber: null,
     deliveryDate: new Date("2026-10-01T00:00:00.000Z"),
+    mrDate: null,
+    poDate: null,
     notes: [],
     version: 1,
     createdAt: now,

@@ -68,6 +68,8 @@ export function toDeliveryDto(row: DeliveryRow): MaterialDeliveryDto {
     })),
     noteNumber: row.noteNumber,
     deliveryDate: toDay(row.deliveryDate),
+    mrDate: row.mrDate ? toDay(row.mrDate) : null,
+    poDate: row.poDate ? toDay(row.poDate) : null,
     deliveryNotes: row.notes.map((note) => ({
       id: note.id,
       name: note.name,
@@ -90,6 +92,8 @@ export function toDeliverySnapshot(row: DeliveryRow) {
     lines: row.lines.map((line) => ({ item: line.item.name, quantity: line.quantity, unit: line.item.unit })),
     noteNumber: row.noteNumber,
     deliveryDate: toDay(row.deliveryDate),
+    mrDate: row.mrDate ? toDay(row.mrDate) : null,
+    poDate: row.poDate ? toDay(row.poDate) : null,
     notes: row.notes.map((note) => ({ name: note.name, key: note.key })),
   };
 }

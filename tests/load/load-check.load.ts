@@ -1,3 +1,4 @@
+import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, statfsSync, writeFileSync } from "node:fs";
 import http from "node:http";
@@ -75,6 +76,9 @@ const TRAFFIC_STAGES = (process.env.LOAD_TRAFFIC_USERS ?? "25,100,250")
 const TRAFFIC_SECONDS = number("LOAD_TRAFFIC_SECONDS", 20);
 // LOAD_ONLY_TRAFFIC=1: make the data, then measure only the traffic (to compare settings quickly).
 const ONLY_TRAFFIC = process.env.LOAD_ONLY_TRAFFIC === "1";
+// LOAD_CLUSTER_WORKERS=N: serve the requests that go over HTTP (the traffic) from the built dist/cluster.js with N server
+// processes, started on the scratch schema, as production runs it (npm run build first). 0: the app inside this process.
+const CLUSTER_WORKERS = number("LOAD_CLUSTER_WORKERS", 0);
 const WARMUP = 5;
 const EXPORT_RUNS = number("LOAD_EXPORT_RUNS", 10);
 const IMPORT_RUNS = number("LOAD_IMPORT_RUNS", 10);
@@ -142,6 +146,7 @@ describe.skipIf(!RUN)("the load check", () => {
   let prisma: PrismaClient;
   let server: http.Server;
   let base = "";
+  let clusterProcess: ChildProcess | undefined;
   let adminId = "";
   let villaId = "";
   let contractorId = "";
@@ -659,10 +664,45 @@ describe.skipIf(!RUN)("the load check", () => {
     server = http.createServer(app);
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+
+    if (CLUSTER_WORKERS > 0) {
+      const port = 18_000 + Math.floor(Math.random() * 1_000);
+      const url = new URL(databaseUrl());
+      url.searchParams.set("schema", schema);
+      clusterProcess = spawn(process.execPath, ["dist/cluster.js"], {
+        env: {
+          ...process.env,
+          DATABASE_URL: url.toString(),
+          PORT: String(port),
+          WEB_CONCURRENCY: String(CLUSTER_WORKERS),
+          SMALL_WORKS_ALERT_JOB_ENABLED: "false",
+          LOG_LEVEL: "warn",
+        },
+        stdio: ["ignore", "inherit", "inherit"],
+      });
+      const clusterBase = `http://127.0.0.1:${port}`;
+      let ready = false;
+      for (let attempt = 0; attempt < 120 && !ready; attempt++) {
+        try {
+          ready = (await fetch(`${clusterBase}/api/v1/health`)).ok;
+        } catch {
+          // not listening yet
+        }
+        if (!ready) await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      expect(ready, "the cluster answers its health check").toBe(true);
+      base = clusterBase;
+      log(`the HTTP requests go to a cluster of ${CLUSTER_WORKERS} server processes on ${base}`);
+    }
   }, 3_600_000);
 
   afterAll(async () => {
     try {
+      if (clusterProcess && clusterProcess.exitCode === null) {
+        const exited = new Promise<void>((resolve) => clusterProcess!.once("exit", () => resolve()));
+        clusterProcess.kill();
+        await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 15_000))]);
+      }
       if (server?.listening) await new Promise<void>((resolve) => server.close(() => resolve()));
       await prisma?.$disconnect().catch(() => undefined);
       if (schema !== "") {
@@ -849,25 +889,16 @@ describe.skipIf(!RUN)("the load check", () => {
       await get("/owner-notes?limit=20", "list", "GET /owner-notes (page of 20)");
       await get("/foreman-missions?limit=20", "list", "GET /foreman-missions (page of 20)");
       await get("/maintenance?limit=20", "list", "GET /maintenance (page of 20)");
+      await get("/monthly-progress?limit=50", "dashboard", "GET /monthly-progress (every villa, owed now)");
       await get(
-        "/monthly-progress?limit=50",
+        "/monthly-progress?limit=50&owed=true",
         "dashboard",
-        "GET /monthly-progress (this month, rebuilt from history)",
+        "GET /monthly-progress (only the villas owed money)",
       );
       await get(
-        `/monthly-progress?limit=50&month=${(() => {
-          const d = new Date();
-          d.setUTCDate(1);
-          d.setUTCMonth(d.getUTCMonth() - 2);
-          return d.toISOString().slice(0, 7);
-        })()}`,
+        "/monthly-progress?limit=50&sort=due:desc",
         "dashboard",
-        "GET /monthly-progress (two months back)",
-      );
-      await get(
-        "/monthly-progress?limit=50&sort=change:desc",
-        "dashboard",
-        "GET /monthly-progress sorted by change",
+        "GET /monthly-progress sorted by amount owed",
       );
       // Every villa is there, and the history moved them: the open works went from half to their progress now 10 days ago.
       const monthly = await request(server)

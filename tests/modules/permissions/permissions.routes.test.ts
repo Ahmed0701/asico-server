@@ -115,6 +115,7 @@ describe("GET /permissions", () => {
       "maintenance",
       "materials",
       "open-works",
+      "overhead",
       "owner-notes",
       "payments",
       "permissions",
