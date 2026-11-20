@@ -10,7 +10,7 @@ const schema = readFileSync(new URL("../../prisma/schema.prisma", import.meta.ur
 );
 
 describe("generated Prisma client", () => {
-  it("exposes exactly the 44 approved models", () => {
+  it("exposes exactly the 45 approved models", () => {
     expect(Object.values(Prisma.ModelName).sort()).toEqual(
       [
         "Area",
@@ -33,6 +33,7 @@ describe("generated Prisma client", () => {
         "MaterialDeliveryLine",
         "MaterialDeliveryNote",
         "MaterialItem",
+        "MewInspectionReport",
         "Notification",
         "NotificationRecipient",
         "OverheadEmployee",

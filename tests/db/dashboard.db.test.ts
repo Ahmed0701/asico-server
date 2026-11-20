@@ -376,11 +376,14 @@ describe.skipIf(!RUN)("the dashboard on a real database (scratch schema)", () =>
       await addVilla(db, "t0", { target: 0 });
       await addVilla(db, "t29", { target: 29, ready: true });
       await addVilla(db, "t30", { target: 30 });
+      // On follow up but passed the MEW inspection: it has left the follow-up list.
+      await addVilla(db, "passed", { ready: true });
+      await run(db, `UPDATE "Villa" SET "mewInspectionPassedAt" = now() WHERE "id" = 'passed'`);
       return repository().villaCounters(dayRange(NOW), db);
     });
 
     // The three base villas have no target date, so they are neither. Due today is upcoming; the 30th day out is neither.
-    expect(plain(counters)).toEqual({ total: 9, overdue: 3, upcoming: 2, mewFollowUp: 2, mewInspection: 0 });
+    expect(plain(counters)).toEqual({ total: 10, overdue: 3, upcoming: 2, mewFollowUp: 2, mewInspection: 0 });
   });
 
   it("counts the villas on the MEW inspection list that have not passed it, and the open and solved maintenance villas", async () => {

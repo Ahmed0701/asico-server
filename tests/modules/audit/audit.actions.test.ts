@@ -156,6 +156,8 @@ const ENGLISH: Record<string, string> = {
   "villa_document.delete": "Deleted a villa document",
   "villa_image.upload": "Added site images to a villa",
   "villa_image.delete": "Removed a site image from a villa",
+  "mew_report.upload": "Uploaded a MEW inspection report",
+  "mew_report.delete": "Removed a MEW inspection report",
   "progress_payment.create": "Paid a contractor for a villa's progress",
   "progress_payment.delete": "Took back a progress payment",
   "progress_payment.import": "Imported previous payments",
@@ -165,7 +167,7 @@ const ENGLISH: Record<string, string> = {
 describe("action labels", () => {
   it("knows exactly the actions of the list above", () => {
     expect(Object.keys(ACTION_LABEL_KEYS).sort()).toEqual(Object.keys(ENGLISH).sort());
-    expect(Object.keys(ENGLISH)).toHaveLength(141);
+    expect(Object.keys(ENGLISH)).toHaveLength(143);
   });
 
   it.each(Object.entries(ENGLISH))("%s reads %j in English", (code, english) => {

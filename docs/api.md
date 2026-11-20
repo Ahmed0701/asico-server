@@ -222,12 +222,16 @@ Deliveries from the switchgear and cable factories to the villas, each with its 
 
 The Site Images section of the villa page: JPEG or PNG photos of the villa site, kept in the villa's folder. Behind the villa documents' permissions.
 
-| Method   | Path                      | Access                     | Idempotency-Key | If-Match | Purpose                                                                      |
-| -------- | ------------------------- | -------------------------- | --------------- | -------- | ---------------------------------------------------------------------------- |
-| `GET`    | `/villas/:villaId/images` | `villa-documents:download` | —               | —        | The villa's site images, the newest first                                    |
-| `POST`   | `/villas/:villaId/images` | `villa-documents:upload`   | —               | —        | Add photos: JPEG or PNG (multipart `file`, up to 20 at once, 200 on a villa) |
-| `GET`    | `/villa-images/:id/file`  | `villa-documents:download` | —               | —        | Show one image (inline)                                                      |
-| `DELETE` | `/villa-images/:id`       | `villa-documents:delete`   | —               | —        | Remove one image                                                             |
+| Method   | Path                                          | Access                     | Idempotency-Key | If-Match | Purpose                                                                      |
+| -------- | --------------------------------------------- | -------------------------- | --------------- | -------- | ---------------------------------------------------------------------------- |
+| `GET`    | `/villas/:villaId/images`                     | `villa-documents:download` | —               | —        | The villa's site images, the newest first                                    |
+| `POST`   | `/villas/:villaId/images`                     | `villa-documents:upload`   | —               | —        | Add photos: JPEG or PNG (multipart `file`, up to 20 at once, 200 on a villa) |
+| `GET`    | `/villa-images/:id/file`                      | `villa-documents:download` | —               | —        | Show one image (inline)                                                      |
+| `GET`    | `/mew-inspection-reports`                     | `villas:read`              | —               | —        | The MEW inspection reports of some villas (`villaIds=a,b,c`, up to 200)      |
+| `GET`    | `/villas/:villaId/mew-inspection-report/file` | `villas:read`              | —               | —        | Send a villa's MEW inspection report (PDF, inline)                           |
+| `POST`   | `/villas/:villaId/mew-inspection-report`      | `villas:inspection`        | —               | —        | Upload a villa's MEW inspection report (one PDF, replaces the old one)       |
+| `DELETE` | `/villas/:villaId/mew-inspection-report`      | `villas:inspection`        | —               | —        | Remove a villa's MEW inspection report                                       |
+| `DELETE` | `/villa-images/:id`                           | `villa-documents:delete`   | —               | —        | Remove one image                                                             |
 
 ### Villa budget
 

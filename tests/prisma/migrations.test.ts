@@ -101,6 +101,7 @@ describe("migration order", () => {
       "progress_payment_manual",
       "villa_material_orders",
       "rate_limit_hits",
+      "mew_inspection_reports",
     ]);
   });
 

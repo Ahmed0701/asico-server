@@ -30,8 +30,8 @@ const slice19 = names.find((name) => name.endsWith("_slice19_schema"))!;
 const before = names.filter((name) => name < slice19);
 
 describe("the slice 19 migration file", () => {
-  it("comes before the later migrations (villa type, open work notifications, MEW follow up, progress ratio, no automatic open works, MEW states and inspection, MEW inspection passed, MEW inspection date, no ready for inspection, maintenance villas, material deliveries, material items, delivery note files, required default, no fixed materials, users delete permission, owner notes, owner from villa, foreman missions, contractor payments, variation orders, open work progress updated, variation order number ignoring case, open works by villa and phase, villa finance, department overhead, overhead role, villa salary share, overhead expenses, overhead expense files, material delivery MR and PO dates, villa vendors, villa vendors list, villa images, progress payments, progress payment manual, villa material orders, rate limit hits), and the script that checks it exists", () => {
-    expect(names.slice(-39)).toEqual([
+  it("comes before the later migrations (villa type, open work notifications, MEW follow up, progress ratio, no automatic open works, MEW states and inspection, MEW inspection passed, MEW inspection date, no ready for inspection, maintenance villas, material deliveries, material items, delivery note files, required default, no fixed materials, users delete permission, owner notes, owner from villa, foreman missions, contractor payments, variation orders, open work progress updated, variation order number ignoring case, open works by villa and phase, villa finance, department overhead, overhead role, villa salary share, overhead expenses, overhead expense files, material delivery MR and PO dates, villa vendors, villa vendors list, villa images, progress payments, progress payment manual, villa material orders, rate limit hits, MEW inspection reports), and the script that checks it exists", () => {
+    expect(names.slice(-40)).toEqual([
       slice19,
       "20261112090000_villa_type",
       "20261113090000_open_work_notifications",
@@ -71,6 +71,7 @@ describe("the slice 19 migration file", () => {
       "20261230090000_progress_payment_manual",
       "20261231090000_villa_material_orders",
       "20270102090000_rate_limit_hits",
+      "20270103090000_mew_inspection_reports",
     ]);
     expect(connectionOf("postgresql://u:p@localhost:5432/asico?schema=public")).toEqual({
       connectionString: "postgresql://u:p@localhost:5432/asico",

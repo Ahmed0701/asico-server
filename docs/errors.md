@@ -190,6 +190,7 @@ See [write-safety.md](write-safety.md).
 | `FILE_TOO_LARGE`        | 413    | The file is over `MAX_UPLOAD_BYTES` (a document), or over 5 MB (an import).   |
 | `VILLA_DOCUMENT_LIMIT`  | 409    | The villa already holds `MAX_DOCUMENTS_PER_VILLA` documents.                  |
 | `VILLA_IMAGE_NOT_FOUND` | 404    | No such site image.                                                           |
+| `MEW_REPORT_NOT_FOUND`  | 404    | The villa has no MEW inspection report.                                       |
 | `VILLA_IMAGE_LIMIT`     | 409    | The villa would hold more than 200 site images.                               |
 | `AUDIT_LOG_NOT_FOUND`   | 404    | No such audit entry.                                                          |
 

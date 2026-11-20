@@ -107,6 +107,7 @@ model User {
   mewPassedVillas     Villa[]                 @relation("VillaMewInspectionPassedMarker")
   uploadedDocuments   VillaDocument[]         @relation("DocumentUploader")
   uploadedVillaImages VillaImage[]            @relation("VillaImageUploader")
+  uploadedMewReports  MewInspectionReport[]   @relation("MewReportUploader")
   progressPayments    ProgressPayment[]       @relation("ProgressPaymentPayer")
   auditLogs           AuditLog[]
   idempotencyKeys     IdempotencyKey[]
@@ -648,6 +649,7 @@ model Villa {
   cableFactory            Factory?                   @relation("VillaCableFactory", fields: [cableFactoryId], references: [id], onDelete: Restrict)
   materialRequirements    VillaMaterialRequirement[]
   materialOrders          VillaMaterialOrder[]
+  mewInspectionReport     MewInspectionReport?
   phaseProgress           VillaPhaseProgress[]
   workItems               WorkItem[]
   dailySmallWorks         DailySmallWork[]
@@ -1028,4 +1030,19 @@ model RateLimitHit {
   resetAt DateTime @db.Timestamptz(3)
 
   @@index([resetAt])
+}
+
+// The MEW inspection report of a villa: one PDF, uploaded from the MEW Inspection list (a new one replaces it), kept in the
+// villa's folder under `key`. It goes with the villa.
+model MewInspectionReport {
+  villaId      String   @id
+  villa        Villa    @relation(fields: [villaId], references: [id], onDelete: Cascade)
+  key          String   @unique
+  name         String
+  size         Int
+  uploadedById String?
+  uploadedBy   User?    @relation("MewReportUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedAt   DateTime
+
+  @@index([uploadedById])
 }

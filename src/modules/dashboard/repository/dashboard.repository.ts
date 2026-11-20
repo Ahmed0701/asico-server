@@ -120,7 +120,7 @@ export class DashboardRepository {
           WHERE v."targetDate" >= ${asDay(today)}::date
             AND v."targetDate" < ${asDay(until)}::date
         ) AS "upcoming",
-        count(*) FILTER (WHERE v."mewFollowUpAt" IS NOT NULL) AS "mewFollowUp",
+        count(*) FILTER (WHERE v."mewFollowUpAt" IS NOT NULL AND v."mewInspectionPassedAt" IS NULL) AS "mewFollowUp",
         count(*) FILTER (
           WHERE v."mewInspectionAt" IS NOT NULL AND v."mewInspectionPassedAt" IS NULL
         ) AS "mewInspection"

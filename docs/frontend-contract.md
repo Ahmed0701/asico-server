@@ -1066,6 +1066,29 @@ PDF files attached to a villa (a contract, a permit). `POST /villas/:villaId/doc
 
 **Errors:** `INVALID_FILE_TYPE`, `NO_FILE_PROVIDED`, `VILLA_IMAGE_LIMIT`, `VILLA_IMAGE_NOT_FOUND`, `VILLA_NOT_FOUND`
 
+### MEW inspection report
+
+A villa's MEW inspection report, uploaded from the MEW Inspection list: one PDF per villa, a new upload replaces it.
+
+- `GET /mew-inspection-reports?villaIds=a,b,c` (needs `villas:read`) answers `{ data: MewReportDto[] }`: the reports of those villas (up to 200 ids), a villa without one is simply missing.
+- `GET /villas/:villaId/mew-inspection-report/file` (needs `villas:read`) sends the PDF inline; none is `MEW_REPORT_NOT_FOUND`.
+- `POST /villas/:villaId/mew-inspection-report` (needs `villas:inspection`) takes the PDF (multipart, named `file`; told by its content, anything else is `INVALID_FILE_TYPE`) and answers `{ data: MewReportDto }` (201). The old file is removed.
+- `DELETE /villas/:villaId/mew-inspection-report` (needs `villas:inspection`) removes it (204).
+
+#### `MewReportDto`
+
+| Field        | Type                   | Notes                                             |
+| ------------ | ---------------------- | ------------------------------------------------- |
+| `villaId`    | `string`               | The villa.                                        |
+| `name`       | `string`               | The file name.                                    |
+| `size`       | `number`               | Size in bytes.                                    |
+| `uploadedBy` | `{ id, name } \| null` | Who uploaded it; null when that user was deleted. |
+| `uploadedAt` | `string`               | ISO 8601 instant, UTC.                            |
+
+<!-- modules: mew-inspection-reports -->
+
+**Errors:** `INVALID_FILE_TYPE`, `MEW_REPORT_NOT_FOUND`, `NO_FILE_PROVIDED`, `VILLA_NOT_FOUND`
+
 ### Villa budget
 
 `GET /villas/:villaId/finance` and `PUT /villas/:villaId/finance` answer `{ data: VillaFinanceDto }` with the row's version in `ETag`. The PUT takes any of `budgetMinor` (the villa's own budget, saved in KWD; it moves the villa's version on), `workOrderMinor`, `materialsMinor`, `pettyCashMinor` (KWD fils, 0 or more), `salaryShareBp` (the villa's share of the Department Overhead monthly salaries in hundredths of a percent, 0 to 10000; all villas together at most 10000, or `SALARY_SHARE_OVER_LIMIT`); null clears one; at least one. The salaries are not typed: `salariesMinor` is worked out from the share. Before the first save the version is 0 and the PUT is sent without If-Match; two first saves at once answer the second `VERSION_CONFLICT`.
@@ -1875,7 +1898,7 @@ How many workers a contractor had on a villa on a day.
 - **A card with nothing to count is not `null`:** it holds zeros, an empty list, and a `null` average where there is nothing to average.
 - The **villas card** is seven keys that are all present or all `null` together: `villas`, `progress`, `overdue`, `upcoming`, `mewFollowUp`, `mewInspection`, `byArea`.
 - `progress` counts villas **derived from the phase progress**: not started (0 in every active phase), done (100 in every one of them, and there is at least one), in progress otherwise. The three add up to `villas.total`; `average` is the mean overall progress, one decimal.
-- `overdue` and `upcoming` look at the villas' **target date**: overdue is before today, upcoming is from today to 30 days ahead (a villa due today is upcoming). `mewFollowUp.count` is the villas on the MEW follow-up list, put there by a person, never derived from the progress. `mewInspection.count` is the villas on the MEW inspection list that have not passed it yet.
+- `overdue` and `upcoming` look at the villas' **target date**: overdue is before today, upcoming is from today to 30 days ahead (a villa due today is upcoming). `mewFollowUp.count` is the villas on the MEW follow-up list, put there by a person, never derived from the progress, that have not passed the MEW inspection (a passed villa leaves the list; taking the pass back returns it). `mewInspection.count` is the villas on the MEW inspection list that have not passed it yet.
 - `maintenance` (`maintenance:read`) counts the maintenance villas still `open` and the ones checked as `solved`.
 - `ownerNotes` (`owner-notes:read`) counts the owner notes still `open` (reminded daily) and the ones checked as `done`.
 - `foremanMissions` (`foreman-missions:read`) counts the foreman missions still `open` (reminded daily) and the ones checked as `done`.

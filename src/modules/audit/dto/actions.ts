@@ -143,6 +143,8 @@ export const ACTION_LABEL_KEYS = {
   "villa_document.delete": "actions.villa_document.delete",
   "villa_image.upload": "actions.villa_image.upload",
   "villa_image.delete": "actions.villa_image.delete",
+  "mew_report.upload": "actions.mew_report.upload",
+  "mew_report.delete": "actions.mew_report.delete",
   "progress_payment.create": "actions.progress_payment.create",
   "progress_payment.delete": "actions.progress_payment.delete",
   "progress_payment.import": "actions.progress_payment.import",
