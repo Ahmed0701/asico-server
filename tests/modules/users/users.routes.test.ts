@@ -411,7 +411,7 @@ describe("POST /users", () => {
   });
 
   it.each([
-    ["a role", { ...body, role: "ADMIN" }],
+    ["an unknown role", { ...body, role: "OWNER" }],
     ["an unknown field", { ...body, extra: 1 }],
     ["an empty body", {}],
     ["a bad email", { ...body, email: "nope" }],
@@ -720,3 +720,109 @@ describe("PATCH /users/:id/deactivate and /activate", () => {
 });
 
 // Deleting users: see users.delete.test.ts.
+
+describe("choosing who is an administrator", () => {
+  const setRole = async (id: string, role: unknown, user: User = admin, language = "en") =>
+    call("patch", `/users/${id}/role`)
+      .set(await as(user))
+      .set("Accept-Language", language)
+      .send({ role });
+  const auditActions = () => (store.auditRows as unknown as { action: string }[]).map((row) => row.action);
+
+  it("an ADMIN makes an engineer an ADMIN: every permission is implied and the stored ones go", async () => {
+    const eng = employeeWith("eng@example.test", "villas:read");
+
+    const res = await setRole(eng.id, "ADMIN");
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ id: eng.id, role: "ADMIN", version: 2 });
+    expect([...res.body.data.permissions].sort()).toEqual([...PERMISSION_CODES].sort());
+    expect(store.grants.filter((grant) => grant.userId === eng.id)).toEqual([]);
+    expect(auditActions()).toEqual(["user.role_change"]);
+    expect(store.auditRows[0]).toMatchObject({ before: { role: "EMPLOYEE" }, after: { role: "ADMIN" } });
+  });
+
+  it("there can be more than one ADMIN, and an ADMIN can make another one an engineer again, with no permissions", async () => {
+    const second = employee("second@example.test", "Second", { role: "ADMIN" });
+
+    const res = await setRole(second.id, "EMPLOYEE");
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ role: "EMPLOYEE", permissions: [] });
+    // The new ADMIN works as one: it may now change roles itself.
+    const third = employee("third@example.test");
+    expect((await setRole(second.id, "ADMIN")).status).toBe(200);
+    expect((await setRole(third.id, "ADMIN", { ...second, role: "ADMIN" })).status).toBe(200);
+  });
+
+  it("never on yourself (so one ADMIN is always left)", async () => {
+    const res = await setRole(admin.id, "EMPLOYEE", admin, "ar");
+
+    expect(res.status).toBe(422);
+    expect(res.body).toMatchObject({ code: "USER_ROLE_SELF", message: "لا يمكنك تغيير دورك بنفسك" });
+    expect(store.users.find((user) => user.id === admin.id)?.role).toBe("ADMIN");
+  });
+
+  it("only an ADMIN, even with users:update", async () => {
+    const editor = employeeWith("editor@example.test", "users:update");
+    const eng = employee("eng@example.test");
+
+    const res = await setRole(eng.id, "ADMIN", editor);
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("ROLE_ADMIN_ONLY");
+    expect(store.users.find((user) => user.id === eng.id)?.role).toBe("EMPLOYEE");
+    expect((await call("patch", `/users/${eng.id}/role`).send({ role: "ADMIN" })).status).toBe(401);
+  });
+
+  it("the same role changes nothing and writes no audit entry", async () => {
+    const eng = employee("eng@example.test");
+
+    const res = await setRole(eng.id, "EMPLOYEE");
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.version).toBe(1);
+    expect(store.auditRows).toHaveLength(0);
+  });
+
+  it("validates the role and the id, and answers 404 for an unknown user", async () => {
+    const eng = employee("eng@example.test");
+    expect((await setRole(eng.id, "OWNER")).status).toBe(400);
+    expect((await setRole(eng.id, undefined)).status).toBe(400);
+    expect((await setRole("nope", "ADMIN")).status).toBe(400);
+    expect((await setRole(ANY_ID, "ADMIN")).body.code).toBe("USER_NOT_FOUND");
+  });
+
+  it("refuses a stale version with If-Match", async () => {
+    const eng = employee("eng@example.test");
+    const res = await call("patch", `/users/${eng.id}/role`)
+      .set(await as(admin))
+      .set("If-Match", '"7"')
+      .send({ role: "ADMIN" });
+    expect(res.status).toBe(409);
+    expect(store.users.find((user) => user.id === eng.id)?.role).toBe("EMPLOYEE");
+  });
+
+  it("creating: an ADMIN may create another ADMIN (its permissions implied), nobody else may", async () => {
+    const created = await call("post", "/users")
+      .set(await as(admin))
+      .send({
+        name: "Admin Two",
+        email: "two@example.test",
+        password: "Correct-Horse-9",
+        role: "ADMIN",
+        permissions: ["villas:read"],
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.data.role).toBe("ADMIN");
+    expect(store.grants.filter((grant) => grant.userId === created.body.data.id)).toEqual([]);
+
+    const creator = employeeWith("creator@example.test", "users:create");
+    const refused = await call("post", "/users")
+      .set(await as(creator))
+      .send({ name: "Sneaky", email: "sneaky@example.test", password: "Correct-Horse-9", role: "ADMIN" });
+    expect(refused.status).toBe(403);
+    expect(refused.body.code).toBe("ROLE_ADMIN_ONLY");
+    expect(store.users.some((user) => user.email === "sneaky@example.test")).toBe(false);
+  });
+});

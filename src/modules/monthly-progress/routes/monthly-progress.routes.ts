@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { auth } from "../../../core/middleware/auth.js";
+import { denyEngineerScope } from "../../../core/middleware/denyEngineerScope.js";
 import { idempotent } from "../../../core/idempotency/index.js";
 import { importFingerprint, receiveImportFile } from "../../../core/middleware/importUpload.js";
 import { exportRateLimiter, importRateLimiter } from "../../../core/middleware/rateLimit.js";
@@ -17,14 +18,17 @@ import {
 
 const controller = new MonthlyProgressController();
 
+// The payments are the villas' money: a user linked to an electrical engineer never reaches them (denyEngineerScope).
+
 export const monthlyProgressRouter = Router();
 
 // The Monthly Payments page: each villa's progress now, its last payment and what its contractor is owed now. Read with
-// villas:read.
+// villas:read. Never by a user linked to an electrical engineer.
 monthlyProgressRouter.get(
   "/monthly-progress",
   auth,
   requirePermission(PERMISSIONS.VILLAS_READ),
+  denyEngineerScope,
   validate(monthlyProgressQuerySchema, "query"),
   controller.list,
 );
@@ -34,6 +38,7 @@ monthlyProgressRouter.get(
   "/villas/:villaId/progress-payments",
   auth,
   requirePermission(PERMISSIONS.PAYMENTS_READ),
+  denyEngineerScope,
   validate(villaPaymentParams, "params"),
   controller.villaHistory,
 );
@@ -43,6 +48,7 @@ monthlyProgressRouter.get(
   "/villas/:villaId/progress-payments/export",
   auth,
   requirePermission(PERMISSIONS.PAYMENTS_READ),
+  denyEngineerScope,
   exportRateLimiter,
   validate(villaPaymentParams, "params"),
   controller.exportVillaHistory,
@@ -54,6 +60,7 @@ monthlyProgressRouter.post(
   "/villas/:villaId/progress-payments",
   auth,
   requirePermission(PERMISSIONS.PAYMENTS_CREATE),
+  denyEngineerScope,
   validate(villaPaymentParams, "params"),
   controller.pay,
 );
@@ -63,6 +70,7 @@ monthlyProgressRouter.get(
   "/progress-payments/import/template",
   auth,
   requirePermission(PERMISSIONS.PAYMENTS_CREATE),
+  denyEngineerScope,
   importRateLimiter,
   controller.importTemplate,
 );
@@ -70,6 +78,7 @@ monthlyProgressRouter.post(
   "/progress-payments/import",
   auth,
   requirePermission(PERMISSIONS.PAYMENTS_CREATE),
+  denyEngineerScope,
   importRateLimiter,
   validate(importQuerySchema, "query"),
   receiveImportFile,
@@ -82,6 +91,7 @@ monthlyProgressRouter.post(
   "/villas/:villaId/progress-payments/manual",
   auth,
   requirePermission(PERMISSIONS.PAYMENTS_CREATE),
+  denyEngineerScope,
   validate(villaPaymentParams, "params"),
   validate(manualPaymentSchema, "body"),
   controller.addManual,
@@ -90,6 +100,7 @@ monthlyProgressRouter.delete(
   "/progress-payments/:id",
   auth,
   requirePermission(PERMISSIONS.PAYMENTS_DELETE),
+  denyEngineerScope,
   validate(paymentParams, "params"),
   controller.undo,
 );

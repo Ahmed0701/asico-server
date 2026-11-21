@@ -11,7 +11,9 @@ export type UserDto = {
   createdAt: string;
 };
 
-export type MeDto = UserDto & { permissions: string[] };
+// `engineerScope` is there (true) only for a user linked to an electrical engineer: it sees only that engineer's villas,
+// and never a villa's budget or the payments owed.
+export type MeDto = UserDto & { permissions: string[]; engineerScope?: true };
 
 export type AccessTokenDto = {
   accessToken: string;

@@ -24,7 +24,12 @@ import {
   type UserSort,
 } from "../dto/users.dto.js";
 import { UsersRepository, type Db } from "../repository/users.repository.js";
-import type { CreateUserInput, ListUsersQuery, UpdateUserInput } from "../validators/users.validators.js";
+import type {
+  CreateUserInput,
+  ListUsersQuery,
+  SetUserRoleInput,
+  UpdateUserInput,
+} from "../validators/users.validators.js";
 
 const DEFAULT_SORT: UserSort = { field: "createdAt", direction: "desc" };
 
@@ -68,8 +73,14 @@ export class UsersService {
   }
 
   async create(actor: Actor, input: CreateUserInput, ctx: RequestContext): Promise<MeDto> {
+    const admin = input.role === "ADMIN";
+    // Only an ADMIN makes another ADMIN; an ADMIN's permissions are implied by the role, so none are stored.
+    if (admin && actor.role !== "ADMIN") {
+      throw fail(ctx, 403, "errors.roleAdminOnly", "ROLE_ADMIN_ONLY");
+    }
+    const permissions = admin ? [] : input.permissions;
     // users:create alone must not be a way around permissions:assign: the new user's password is chosen by the caller.
-    if (input.permissions.length > 0 && !(await this.mayAssignPermissions(actor))) {
+    if (permissions.length > 0 && !(await this.mayAssignPermissions(actor))) {
       throw fail(ctx, 403, "errors.forbidden", "PERMISSION_ASSIGN_REQUIRED");
     }
     if (await this.repository.findByEmail(input.email)) {
@@ -80,10 +91,10 @@ export class UsersService {
     try {
       const { user, codes } = await this.repository.transaction(async (tx) => {
         const created = await this.repository.createUser(
-          { name: input.name, email: input.email, passwordHash, isActive: input.isActive },
+          { name: input.name, email: input.email, passwordHash, isActive: input.isActive, role: input.role },
           tx,
         );
-        const { after } = await this.permissions.setUserCodes(created.id, input.permissions, tx);
+        const { after } = await this.permissions.setUserCodes(created.id, permissions, tx);
         await audit.record(
           tx,
           withMeta(ctx, {
@@ -102,7 +113,7 @@ export class UsersService {
         );
         return { user: created, codes: after };
       });
-      return toMeDto(user, codes);
+      return toMeDto(user, admin ? [...PERMISSION_CODES] : codes);
     } catch (err) {
       // Two requests with the same email can both pass the check above; the unique index decides.
       if (isUniqueViolation(err)) {
@@ -167,6 +178,49 @@ export class UsersService {
       }
       throw err;
     }
+  }
+
+  // Makes a user an ADMIN or an EMPLOYEE (an engineer), so there can be more than one ADMIN. Only an ADMIN may, and never on
+  // itself (so there is always one left). The account of an electrical engineer cannot be an ADMIN (an ADMIN sees every
+  // villa): unlink it first. An ADMIN keeps no permission rows; a user made an EMPLOYEE starts with none.
+  async setRole(
+    actor: Actor,
+    id: string,
+    input: SetUserRoleInput,
+    ctx: RequestContext,
+    expectedVersion?: number,
+  ): Promise<MeDto> {
+    if (actor.role !== "ADMIN") {
+      throw fail(ctx, 403, "errors.roleAdminOnly", "ROLE_ADMIN_ONLY");
+    }
+    if (actor.id === id) {
+      throw fail(ctx, 422, "errors.userRoleSelf", "USER_ROLE_SELF");
+    }
+    const user = await this.repository.transaction(async (tx) => {
+      const target = await this.lock(id, expectedVersion, ctx, tx);
+      if (target.role === input.role) return target;
+      if (input.role === "ADMIN" && (await this.repository.linkedEngineer(id, tx))) {
+        throw fail(ctx, 409, "errors.userIsEngineerAccount", "USER_IS_ENGINEER_ACCOUNT");
+      }
+      const changed = await this.repository.setRole(id, target.version, input.role, tx);
+      if (!changed) {
+        throw versionConflict(ctx.locale, (await this.repository.lockVersion(id, tx)) ?? target.version);
+      }
+      await this.permissions.setUserCodes(id, [], tx);
+      await audit.record(
+        tx,
+        withMeta(ctx, {
+          actorId: actor.id,
+          action: "user.role_change",
+          entity: "User",
+          entityId: id,
+          before: { role: target.role },
+          after: { role: changed.role },
+        }),
+      );
+      return changed;
+    });
+    return toMeDto(user, await this.codesOf(user));
   }
 
   async activate(actor: Actor, id: string, ctx: RequestContext, expectedVersion?: number): Promise<UserDto> {
@@ -242,6 +296,17 @@ export class UsersService {
         }
         if ((await this.repository.countAuthoredRecords(id, tx)) > 0) {
           throw fail(ctx, 409, "errors.userHasRecords", "USER_HAS_RECORDS");
+        }
+        // The account of an electrical engineer who still has villas stays until they are moved to another engineer.
+        const engineer = await this.repository.linkedEngineer(id, tx);
+        if (engineer && engineer.villas > 0) {
+          throw new AppError(
+            409,
+            t(ctx.locale, "errors.userEngineerHasVillas")
+              .replace("{{name}}", engineer.name)
+              .replace("{{count}}", String(engineer.villas)),
+            "USER_ENGINEER_HAS_VILLAS",
+          );
         }
         if (!(await this.repository.delete(id, target.version, tx))) {
           throw versionConflict(ctx.locale, (await this.repository.lockVersion(id, tx)) ?? target.version);

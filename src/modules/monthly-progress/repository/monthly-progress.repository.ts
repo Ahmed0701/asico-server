@@ -1,4 +1,5 @@
 import { prisma } from "../../../core/database/prisma.js";
+import { andVillaScope } from "../../../core/scope/villa-scope.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import { WORK_PHASE_PROGRESS } from "../../villa-progress/repository/progress-rows.js";
 import type { PhaseRatio, WorkEvent, WorkNow } from "../service/progress-history.js";
@@ -241,7 +242,7 @@ export class MonthlyProgressRepository {
     db: Db,
   ): Promise<{ villaNumber: string; contractorId: string | null; workOrderMinor: bigint | null } | null> {
     const locked = await db.$queryRaw<{ id: string }[]>(
-      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" = ${villaId} FOR UPDATE`,
+      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" = ${villaId}${andVillaScope("Villa")} FOR UPDATE`,
     );
     if (locked.length === 0) return null;
     const villa = await db.villa.findUnique({

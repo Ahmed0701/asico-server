@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import { currentVillaScope } from "../../../core/scope/villa-scope.js";
 import { audit, type AuditEntry } from "../../../core/audit/audit.js";
 import { env } from "../../../core/config/env.js";
 import { logger } from "../../../core/config/logger.js";
@@ -283,9 +284,12 @@ export class AuthService {
   async getMe(userId: string, ctx: RequestContext): Promise<MeDto> {
     const user = await this.requireUser(userId, ctx);
     // ADMIN permissions are implied by the role, so no rows exist for them.
-    const permissions =
+    const granted =
       user.role === "ADMIN" ? [...PERMISSION_CODES] : await this.repository.getPermissionCodes(userId);
-    return toMeDto(user, permissions);
+    // A user linked to an electrical engineer never deletes a villa, whatever it was granted (villas.service refuses it).
+    if (!currentVillaScope()) return toMeDto(user, granted);
+    const permissions = granted.filter((code) => code !== "villas:delete");
+    return { ...toMeDto(user, permissions), engineerScope: true };
   }
 
   async updateMe(userId: string, input: UpdateMeInput, ctx: RequestContext): Promise<MeDto> {

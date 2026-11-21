@@ -19,6 +19,7 @@ type StoredEngineer = {
   phone: string;
   email: string | null;
   status: PartyStatusValue;
+  userId?: string | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -75,6 +76,7 @@ function toRow(engineer: StoredEngineer): ElectricalEngineerRow {
     version: engineer.version,
     createdAt: engineer.createdAt,
     updatedAt: engineer.updatedAt,
+    user: engineer.userId ? { id: engineer.userId, name: "Linked user", email: "linked@example.test" } : null,
     _count: {
       villas: electricalTables.villaRefs.filter((ref) => ref.engineerId === engineer.id).length,
       dailyReports: dailyReportTables.count({ preparedByEngineerId: engineer.id }),
@@ -141,6 +143,23 @@ export class InMemoryElectricalEngineersRepository implements ElectricalEngineer
       .map((e) => ({ id: e.id, name: e.name, extra: "must not leak" }));
   }
 
+  // Users live in the auth tests' store; these tests link none.
+  async userOptions(): Promise<
+    {
+      id: string;
+      name: string;
+      email: string;
+      isActive: boolean;
+      electricalEngineer: { id: string; name: string } | null;
+    }[]
+  > {
+    return [];
+  }
+
+  async findUser(): Promise<{ role: string; electricalEngineer: { id: string } | null } | null> {
+    return null;
+  }
+
   async findById(id: string): Promise<ElectricalEngineerRow | null> {
     const engineer = electricalTables.engineers.find((candidate) => candidate.id === id);
     return engineer ? toRow(engineer) : null;
@@ -151,9 +170,23 @@ export class InMemoryElectricalEngineersRepository implements ElectricalEngineer
     phone: string;
     email: string | null;
     status: PartyStatusValue;
+    userId?: string | null;
   }): Promise<ElectricalEngineerRow> {
     const now = new Date();
     return toRow(addElectricalEngineer({ ...data, createdAt: now, updatedAt: now }));
+  }
+
+  async villaNumbersOf(id: string): Promise<string[]> {
+    return electricalTables.villaRefs.filter((ref) => ref.engineerId === id).map((_, i) => `V-${i + 1}`);
+  }
+
+  // A new array, so a rolled-back transaction gets the old one back.
+  async moveVillas(fromId: string, toId: string): Promise<number> {
+    const moved = electricalTables.villaRefs.filter((ref) => ref.engineerId === fromId).length;
+    electricalTables.villaRefs = electricalTables.villaRefs.map((ref) =>
+      ref.engineerId === fromId ? { engineerId: toId } : ref,
+    );
+    return moved;
   }
 
   async lockVersion(id: string): Promise<number | null> {

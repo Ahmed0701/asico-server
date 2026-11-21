@@ -80,6 +80,21 @@ export class CivilEngineersRepository {
     });
   }
 
+  // The numbers of the engineer's villas, for the audit entry of a transfer.
+  async villaNumbersOf(id: string, db: Db): Promise<string[]> {
+    const rows = await db.villa.findMany({ where: { civilEngineerId: id }, select: { villaNumber: true } });
+    return rows.map((row) => row.villaNumber);
+  }
+
+  // Gives every villa of one engineer to another, each villa's version bumped (it changed). Answers how many moved.
+  async moveVillas(fromId: string, toId: string, db: Db): Promise<number> {
+    const { count } = await db.villa.updateMany({
+      where: { civilEngineerId: fromId },
+      data: { civilEngineerId: toId, version: { increment: 1 } },
+    });
+    return count;
+  }
+
   findById(id: string, db: Db = prisma): Promise<CivilEngineerRow | null> {
     return db.civilEngineer.findUnique({ where: { id }, select });
   }

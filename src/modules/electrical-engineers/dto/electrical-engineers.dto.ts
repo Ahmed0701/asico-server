@@ -19,6 +19,8 @@ export type ElectricalEngineerDto = {
   phone: string;
   email: string | null;
   status: PartyStatusValue;
+  // The user account linked to the engineer: signed in, it sees only this engineer's villas. Null: none.
+  user: { id: string; name: string; email: string } | null;
   // How many villas have this engineer.
   villaCount: number;
   version: number;
@@ -29,3 +31,12 @@ export type ElectricalEngineerDto = {
 export type ElectricalEngineerOptionDto = { id: string; name: string };
 
 export type ElectricalEngineerListResult = { items: ElectricalEngineerDto[]; meta: PageMeta };
+
+// A user the engineer form can link: every user that is not an ADMIN, with the engineer it is linked to now, if any.
+export type ElectricalEngineerUserOptionDto = {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+  engineer: { id: string; name: string } | null;
+};

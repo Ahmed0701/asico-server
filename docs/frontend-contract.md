@@ -133,6 +133,7 @@ A session is an **access token** (a JWT, 15 minutes by default, kept in memory a
 | `version`     | `number`   | Counts the changes, from 1. Send it back as `If-Match` to refuse an overwrite. |
 | `createdAt`   | `string`   | ISO 8601 instant, UTC.                                                         |
 | `permissions` | `string[]` | Permission codes (see permissions.md). An ADMIN gets all of them.              |
+| `engineerScope` | `true` (optional) | Only for a user linked to an electrical engineer: it sees only that engineer's villas, never a villa's budget or the payments owed. Absent for everyone else. |
 
 #### `AccessTokenDto`
 
@@ -298,8 +299,17 @@ Users are created by an administrator (or someone with `users:create`), who choo
 | `name`        | Yes      | text, 1 to 100 characters          |                                                                                     |
 | `email`       | Yes      | email, lower-cased                 |                                                                                     |
 | `password`    | Yes      | text, 8 to 72 bytes                | The user's first password. It is never returned.                                    |
+| `role`        | No       | `ADMIN` or `EMPLOYEE` (default `EMPLOYEE`) | `EMPLOYEE` is an engineer. Only an ADMIN may create an ADMIN (`ROLE_ADMIN_ONLY`); an ADMIN's permissions are implied, so `permissions` is ignored for it. |
 | `isActive`    | No       | `true` or `false` (default `true`) | false makes an account that cannot sign in yet.                                     |
 | `permissions` | No       | array of permission codes          | Needs `permissions:assign` as well as `users:create` when not empty. Omit for none. |
+
+**Role** `PATCH /users/:id/role` (`If-Match` optional, needs `users:update`, and the caller must be an ADMIN: `ROLE_ADMIN_ONLY`) makes a user an ADMIN or an EMPLOYEE (an engineer), so there can be more than one ADMIN. Answers the `MeDto`. Never on yourself (`USER_ROLE_SELF`), so an ADMIN is always left. The account of an electrical engineer cannot be an ADMIN (`USER_IS_ENGINEER_ACCOUNT`): unlink it first. An ADMIN keeps no stored permissions; a user made an EMPLOYEE starts with none. The same role changes nothing. An ADMIN cannot be deactivated or deleted: make it an EMPLOYEE first.
+
+<!-- body: setUserRoleSchema -->
+
+| Field  | Required | Type                  | Notes |
+| ------ | -------- | --------------------- | ----- |
+| `role` | Yes      | `ADMIN` or `EMPLOYEE` |       |
 
 **Change** `PATCH /users/:id` (`If-Match` optional)
 
@@ -334,9 +344,11 @@ Users are created by an administrator (or someone with `users:create`), who choo
 
 `GET /permissions` answers an array of `PermissionGroupDto`, one per resource, to build the checkbox list. Roles are `ADMIN` and `EMPLOYEE`.
 
+A user who is the account of an electrical engineer that still has villas cannot be deleted (`USER_ENGINEER_HAS_VILLAS`, the message names the engineer and the count): move the villas to another engineer first. An electrical or civil engineer with villas cannot be deleted either (`ELECTRICAL_ENGINEER_IN_USE`, `CIVIL_ENGINEER_HAS_VILLAS`).
+
 <!-- modules: users, permissions -->
 
-**Errors:** `ADMIN_ACCOUNT_PROTECTED`, `ADMIN_CANNOT_BE_DEACTIVATED`, `ADMIN_CANNOT_BE_DELETED`, `ADMIN_PERMISSIONS_IMMUTABLE`, `CANNOT_DEACTIVATE_SELF`, `CANNOT_DELETE_SELF`, `CANNOT_MODIFY_OWN_PERMISSIONS`, `EMAIL_DELIVERY_FAILED`, `EMAIL_TAKEN`, `PERMISSION_ASSIGN_REQUIRED`, `USER_HAS_RECORDS`, `USER_NOT_FOUND`
+**Errors:** `ADMIN_ACCOUNT_PROTECTED`, `ADMIN_CANNOT_BE_DEACTIVATED`, `ADMIN_CANNOT_BE_DELETED`, `ADMIN_PERMISSIONS_IMMUTABLE`, `CANNOT_DEACTIVATE_SELF`, `CANNOT_DELETE_SELF`, `CANNOT_MODIFY_OWN_PERMISSIONS`, `EMAIL_DELIVERY_FAILED`, `EMAIL_TAKEN`, `PERMISSION_ASSIGN_REQUIRED`, `ROLE_ADMIN_ONLY`, `USER_ENGINEER_HAS_VILLAS`, `USER_HAS_RECORDS`, `USER_IS_ENGINEER_ACCOUNT`, `USER_NOT_FOUND`, `USER_ROLE_SELF`
 
 ## Areas
 
@@ -408,7 +420,8 @@ The engineer responsible for a villa (every villa has one). Contact details for 
 
 - `GET /civil-engineers/options` answers the **active** engineers only (up to 1,000), by name, as `CivilEngineerOptionDto`.
 - An inactive engineer stays in the list and in the villas that already have it, but cannot be given to a villa (`CIVIL_ENGINEER_INACTIVE`).
-- An engineer with villas cannot be deleted (`CIVIL_ENGINEER_HAS_VILLAS`): deactivate instead.
+- An engineer with villas cannot be deleted (`CIVIL_ENGINEER_HAS_VILLAS`): move them to another engineer, or deactivate instead.
+- **Moving every villa to another engineer.** `POST /civil-engineers/:id/transfer-villas` with `{ "toEngineerId": "<uuid>" }` (needs `villas:update`) gives every villa of the engineer to another, active, one, all at once, and answers `{ "data": { "moved": 3, "to": { "id": "...", "name": "..." } } }`. Afterwards the engineer can be deleted. The same engineer is `TRANSFER_SAME_ENGINEER`, an inactive one `CIVIL_ENGINEER_INACTIVE`. A user linked to an electrical engineer cannot do it (`403 FORBIDDEN`).
 - `email` is optional and is not unique.
 
 #### `CivilEngineerDto`
@@ -472,7 +485,7 @@ The engineer responsible for a villa (every villa has one). Contact details for 
 
 <!-- modules: civil-engineers -->
 
-**Errors:** `CIVIL_ENGINEER_HAS_VILLAS`, `CIVIL_ENGINEER_NOT_FOUND`
+**Errors:** `CIVIL_ENGINEER_HAS_VILLAS`, `CIVIL_ENGINEER_INACTIVE`, `CIVIL_ENGINEER_NOT_FOUND`, `TRANSFER_SAME_ENGINEER`
 
 ## Electrical engineers
 
@@ -480,20 +493,34 @@ As civil engineers, but optional on a villa.
 
 - `GET /electrical-engineers/options` answers the **active** ones only, as `ElectricalEngineerOptionDto`.
 - An inactive engineer cannot be given to a villa (`ELECTRICAL_ENGINEER_INACTIVE`); one with villas cannot be deleted (`ELECTRICAL_ENGINEER_IN_USE`).
+- **Moving every villa to another engineer.** `POST /electrical-engineers/:id/transfer-villas` with `{ "toEngineerId": "<uuid>" }` (needs `villas:update`) gives every villa of the engineer to another, active, one, all at once, and answers `{ "data": { "moved": 3, "to": { "id": "...", "name": "..." } } }`. Afterwards the engineer can be deleted. The same engineer is `TRANSFER_SAME_ENGINEER`, an inactive one `ELECTRICAL_ENGINEER_INACTIVE`. A user linked to an electrical engineer cannot do it (`403 FORBIDDEN`).
+- **The engineer's user account.** `userId` links one user to the engineer. Signed in, that user sees only the villas of its engineer, everywhere: every list, count, page, picker and dashboard card about villas or what hangs off them (open works, small works, site reports, labour, materials, payments, documents, images...), and the daily reports the engineer prepared. Another engineer's villa answers as not found, and cannot be written to. An ADMIN is never limited and cannot be linked (`ENGINEER_USER_ADMIN`); A villa that engineer adds without an engineer goes to it; naming another engineer, on adding or changing a villa, is `VILLA_ENGINEER_OUT_OF_SCOPE`. It never sees a villa's budget or the Monthly Payments: `GET /villa-finance`, `GET` and `PUT /villas/:villaId/finance` `GET /monthly-progress` and every `progress-payments` route (a villa's payment history, its export, paying, entering or importing earlier payments, undoing one) are `403 FORBIDDEN` for it; it still adds and changes variation orders. That user changes its villas but never deletes one: `DELETE /villas/:id` is `403 FORBIDDEN` for it whatever it was granted, and `GET /auth/me` leaves `villas:delete` out of its permissions; a user linked to another engineer is `ENGINEER_USER_TAKEN`; an unknown one `USER_NOT_FOUND`. `null` unlinks.
+- `GET /electrical-engineers/user-options` (needs `electrical-engineers:update`) answers the users the form can link, as `ElectricalEngineerUserOptionDto[]`: every user but the ADMINs, with the engineer each is linked to now.
 
 #### `ElectricalEngineerDto`
 
-| Field        | Type               | Notes                                                                                         |
-| ------------ | ------------------ | --------------------------------------------------------------------------------------------- |
-| `id`         | `string`           | uuid                                                                                          |
-| `name`       | `string`           |                                                                                               |
-| `phone`      | `string`           | As typed: 5 to 20 characters, digits, spaces and dashes, an optional leading `+`.             |
-| `email`      | `string \| null`   | null when there is none.                                                                      |
-| `status`     | `PartyStatusValue` | `ACTIVE` or `INACTIVE`. An inactive record stays, but cannot be given to a villa or a record. |
-| `villaCount` | `number`           | How many villas have this engineer.                                                           |
-| `version`    | `number`           | Counts the changes, from 1. Send it back as `If-Match` to refuse an overwrite.                |
-| `createdAt`  | `string`           | ISO 8601 instant, UTC.                                                                        |
-| `updatedAt`  | `string`           | ISO 8601 instant, UTC.                                                                        |
+| Field        | Type                          | Notes                                                                                         |
+| ------------ | ----------------------------- | --------------------------------------------------------------------------------------------- |
+| `id`         | `string`                      | uuid                                                                                          |
+| `name`       | `string`                      |                                                                                               |
+| `phone`      | `string`                      | As typed: 5 to 20 characters, digits, spaces and dashes, an optional leading `+`.             |
+| `email`      | `string \| null`              | null when there is none.                                                                      |
+| `status`     | `PartyStatusValue`            | `ACTIVE` or `INACTIVE`. An inactive record stays, but cannot be given to a villa or a record. |
+| `user`       | `{ id, name, email } \| null` | The linked user account; null when none.                                                      |
+| `villaCount` | `number`                      | How many villas have this engineer.                                                           |
+| `version`    | `number`                      | Counts the changes, from 1. Send it back as `If-Match` to refuse an overwrite.                |
+| `createdAt`  | `string`                      | ISO 8601 instant, UTC.                                                                        |
+| `updatedAt`  | `string`                      | ISO 8601 instant, UTC.                                                                        |
+
+#### `ElectricalEngineerUserOptionDto`
+
+| Field      | Type                   | Notes                             |
+| ---------- | ---------------------- | --------------------------------- |
+| `id`       | `string`               | uuid                              |
+| `name`     | `string`               |                                   |
+| `email`    | `string`               |                                   |
+| `isActive` | `boolean`              | An inactive user cannot sign in.  |
+| `engineer` | `{ id, name } \| null` | The engineer it is linked to now. |
 
 #### `ElectricalEngineerOptionDto`
 
@@ -524,25 +551,27 @@ As civil engineers, but optional on a villa.
 
 <!-- body: createElectricalEngineerSchema -->
 
-| Field    | Required | Type                                                                             | Notes |
-| -------- | -------- | -------------------------------------------------------------------------------- | ----- |
-| `name`   | Yes      | text, 1 to 100 characters                                                        |       |
-| `phone`  | Yes      | text, 5 to 20 characters: digits, spaces, dashes, a leading `+`                  |       |
-| `email`  | No       | email, lower-cased (a party's is optional: `null` or empty for none; not unique) |       |
-| `status` | No       | `ACTIVE` or `INACTIVE`                                                           |       |
+| Field    | Required | Type                                                                             | Notes                                                                     |
+| -------- | -------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `name`   | Yes      | text, 1 to 100 characters                                                        |                                                                           |
+| `phone`  | Yes      | text, 5 to 20 characters: digits, spaces, dashes, a leading `+`                  |                                                                           |
+| `email`  | No       | email, lower-cased (a party's is optional: `null` or empty for none; not unique) |                                                                           |
+| `status` | No       | `ACTIVE` or `INACTIVE`                                                           |                                                                           |
+| `userId` | No       | uuid, or `null`                                                                  | The user account to link: signed in, it sees only this engineer's villas. |
 
 <!-- body: updateElectricalEngineerSchema -->
 
-| Field    | Required | Type                                                                             | Notes |
-| -------- | -------- | -------------------------------------------------------------------------------- | ----- |
-| `name`   | No       | text, 1 to 100 characters                                                        |       |
-| `phone`  | No       | text, 5 to 20 characters: digits, spaces, dashes, a leading `+`                  |       |
-| `email`  | No       | email, lower-cased (a party's is optional: `null` or empty for none; not unique) |       |
-| `status` | No       | `ACTIVE` or `INACTIVE`                                                           |       |
+| Field    | Required | Type                                                                             | Notes                                                                     |
+| -------- | -------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `name`   | No       | text, 1 to 100 characters                                                        |                                                                           |
+| `phone`  | No       | text, 5 to 20 characters: digits, spaces, dashes, a leading `+`                  |                                                                           |
+| `email`  | No       | email, lower-cased (a party's is optional: `null` or empty for none; not unique) |                                                                           |
+| `status` | No       | `ACTIVE` or `INACTIVE`                                                           |                                                                           |
+| `userId` | No       | uuid, or `null`                                                                  | The user account to link: signed in, it sees only this engineer's villas. |
 
 <!-- modules: electrical-engineers -->
 
-**Errors:** `ELECTRICAL_ENGINEER_IN_USE`, `ELECTRICAL_ENGINEER_NOT_FOUND`
+**Errors:** `ELECTRICAL_ENGINEER_INACTIVE`, `ELECTRICAL_ENGINEER_IN_USE`, `ELECTRICAL_ENGINEER_NOT_FOUND`, `ENGINEER_USER_ADMIN`, `ENGINEER_USER_TAKEN`, `TRANSFER_SAME_ENGINEER`, `USER_NOT_FOUND`
 
 ## Electrical phases
 
@@ -951,7 +980,7 @@ In this example `1250500` is 1,250.500 KWD: the dinar has three decimals, so `bu
 
 <!-- modules: villas -->
 
-**Errors:** `AREA_NOT_FOUND`, `CIVIL_ENGINEER_INACTIVE`, `CIVIL_ENGINEER_NOT_FOUND`, `CONTRACTOR_INACTIVE`, `CONTRACTOR_NOT_FOUND`, `ELECTRICAL_ENGINEER_INACTIVE`, `ELECTRICAL_ENGINEER_NOT_FOUND`, `IMPORT_DATA_CHANGED`, `NO_FILE_PROVIDED`, `VILLA_ALREADY_MEW_FOLLOW_UP`, `VILLA_ALREADY_MEW_INSPECTION`, `VILLA_ALREADY_MEW_INSPECTION_PASSED`, `VILLA_HAS_RECORDS`, `VILLA_MEW_NOT_APPROVED`, `VILLA_NOT_FOUND`, `VILLA_NOT_MEW_FOLLOW_UP`, `VILLA_NOT_MEW_INSPECTION`, `VILLA_NOT_MEW_INSPECTION_PASSED`, `VILLA_NUMBER_TAKEN`, `VILLA_PLOT_TAKEN`, `VILLA_VARIATION_ORDERS_PENDING`
+**Errors:** `AREA_NOT_FOUND`, `CIVIL_ENGINEER_INACTIVE`, `CIVIL_ENGINEER_NOT_FOUND`, `CONTRACTOR_INACTIVE`, `CONTRACTOR_NOT_FOUND`, `ELECTRICAL_ENGINEER_INACTIVE`, `ELECTRICAL_ENGINEER_NOT_FOUND`, `IMPORT_DATA_CHANGED`, `NO_FILE_PROVIDED`, `VILLA_ALREADY_MEW_FOLLOW_UP`, `VILLA_ALREADY_MEW_INSPECTION`, `VILLA_ALREADY_MEW_INSPECTION_PASSED`, `VILLA_ENGINEER_OUT_OF_SCOPE`, `VILLA_HAS_RECORDS`, `VILLA_MEW_NOT_APPROVED`, `VILLA_NOT_FOUND`, `VILLA_NOT_MEW_FOLLOW_UP`, `VILLA_NOT_MEW_INSPECTION`, `VILLA_NOT_MEW_INSPECTION_PASSED`, `VILLA_NUMBER_TAKEN`, `VILLA_PLOT_TAKEN`, `VILLA_VARIATION_ORDERS_PENDING`
 
 ### Phase progress
 

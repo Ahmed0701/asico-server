@@ -17,11 +17,12 @@ export const listUsersQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().max(100, { error: "validation.searchTooLong" }).optional(),
 });
 
-// The role is never accepted: users created here are always EMPLOYEE.
+// The role defaults to EMPLOYEE (an engineer); only an ADMIN may create another ADMIN (the service checks).
 export const createUserSchema = z.strictObject({
   name,
   email,
   password: newPassword,
+  role: z.enum(Role, { error: "validation.roleInvalid" }).default("EMPLOYEE"),
   isActive: z.boolean({ error: "validation.booleanInvalid" }).default(true),
   permissions: permissionCodes.default([]),
 });
@@ -32,6 +33,12 @@ export const updateUserSchema = z
     error: "validation.atLeastOneField",
   });
 
+// Makes a user an ADMIN or an EMPLOYEE (an engineer). Only an ADMIN may, and never on itself.
+export const setUserRoleSchema = z.strictObject({
+  role: z.enum(Role, { error: "validation.roleInvalid" }),
+});
+
 export type ListUsersQuery = z.output<typeof listUsersQuerySchema>;
 export type CreateUserInput = z.output<typeof createUserSchema>;
 export type UpdateUserInput = z.output<typeof updateUserSchema>;
+export type SetUserRoleInput = z.output<typeof setUserRoleSchema>;

@@ -4,6 +4,7 @@ import { idempotent } from "../../../core/idempotency/index.js";
 import { auth } from "../../../core/middleware/auth.js";
 import { importFingerprint, receiveImportFile } from "../../../core/middleware/importUpload.js";
 import { importRateLimiter } from "../../../core/middleware/rateLimit.js";
+import { requireAdmin } from "../../../core/middleware/requireAdmin.js";
 import { requirePermission } from "../../../core/middleware/requirePermission.js";
 import { validate } from "../../../core/middleware/validate.js";
 import { PERMISSIONS, type Permission } from "../../../shared/constants/permissions.js";
@@ -41,12 +42,14 @@ villasRouter.get("/villas/filters", ...can(PERMISSIONS.VILLAS_READ), controller.
 villasRouter.get(
   "/villas/import/template",
   ...can(PERMISSIONS.VILLAS_IMPORT),
+  requireAdmin,
   importRateLimiter,
   importController.template,
 );
 villasRouter.post(
   "/villas/import",
   ...can(PERMISSIONS.VILLAS_IMPORT),
+  requireAdmin,
   importRateLimiter,
   validate(importQuerySchema, "query"),
   receiveImportFile,
@@ -60,9 +63,11 @@ villasRouter.get(
   validate(idParams, "params"),
   controller.get,
 );
+// Villas are added (one by one or from a file) by an administrator only.
 villasRouter.post(
   "/villas",
   ...can(PERMISSIONS.VILLAS_CREATE),
+  requireAdmin,
   validate(createVillaSchema),
   idempotent(),
   controller.create,

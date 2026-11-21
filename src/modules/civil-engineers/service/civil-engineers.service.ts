@@ -1,4 +1,5 @@
 import { audit, withMeta } from "../../../core/audit/audit.js";
+import { currentVillaScope } from "../../../core/scope/villa-scope.js";
 import { assertVersion, versionConflict } from "../../../core/concurrency/version.js";
 import { AppError } from "../../../core/errors/AppError.js";
 import { t, type MessageKey } from "../../../core/i18n/index.js";
@@ -24,6 +25,7 @@ import type {
   CreateCivilEngineerInput,
   ListCivilEngineersQuery,
   UpdateCivilEngineerInput,
+  TransferVillasInput,
 } from "../validators/civil-engineers.validators.js";
 
 const DEFAULT_SORT: CivilEngineerSort = { field: "name", direction: "asc" };
@@ -187,6 +189,43 @@ export class CivilEngineersService {
 
   // Locks the engineer for this transaction, refuses a version the caller did not read, and returns the row as it is
   // now: what the audit entry records as "before" is exactly what this write replaces.
+  // Moves every villa of the engineer to another, active, engineer, in one transaction, so it can then be deleted. Not
+  // for a user linked to an electrical engineer: its villas would leave its sight.
+  async transferVillas(
+    actor: Actor,
+    id: string,
+    input: TransferVillasInput,
+    ctx: RequestContext,
+  ): Promise<{ moved: number; to: { id: string; name: string } }> {
+    if (currentVillaScope()) {
+      throw new AppError(403, t(ctx.locale, "errors.transferByEngineer"), "FORBIDDEN");
+    }
+    if (input.toEngineerId === id) {
+      throw new AppError(422, t(ctx.locale, "errors.transferSameEngineer"), "TRANSFER_SAME_ENGINEER");
+    }
+    return this.repository.transaction(async (tx) => {
+      const from = await this.lock(id, undefined, ctx, tx);
+      const to = await this.repository.findById(input.toEngineerId, tx);
+      if (!to) throw notFound(ctx);
+      if (to.status !== "ACTIVE") {
+        throw new AppError(400, t(ctx.locale, "errors.civilEngineerInactive"), "CIVIL_ENGINEER_INACTIVE");
+      }
+      const villaNumbers = await this.repository.villaNumbersOf(id, tx);
+      const moved = await this.repository.moveVillas(id, to.id, tx);
+      await audit.record(
+        tx,
+        withMeta(ctx, {
+          actorId: actor.id,
+          action: "civil_engineer.transfer_villas",
+          entity: ENTITY,
+          entityId: id,
+          after: { from: from.name, to: to.name, moved, villas: villaNumbers },
+        }),
+      );
+      return { moved, to: { id: to.id, name: to.name } };
+    });
+  }
+
   private async lock(
     id: string,
     expectedVersion: number | undefined,

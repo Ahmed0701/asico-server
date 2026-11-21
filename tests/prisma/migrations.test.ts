@@ -102,6 +102,8 @@ describe("migration order", () => {
       "villa_material_orders",
       "rate_limit_hits",
       "mew_inspection_reports",
+      "electrical_engineer_user",
+      "multiple_admins",
     ]);
   });
 
@@ -148,10 +150,16 @@ describe("extras migration: the project area index", () => {
 });
 
 describe("extras migration: constraints", () => {
-  it("allows only one ADMIN user through a partial unique index", () => {
+  it("allowed only one ADMIN user through a partial unique index, which a later migration drops", () => {
     expect(extras).toContain(
       `CREATE UNIQUE INDEX "User_single_admin_idx" ON "User" ("role") WHERE "role" = 'ADMIN';`,
     );
+    expect(
+      readFileSync(
+        new URL("../../prisma/migrations/20270105090000_multiple_admins/migration.sql", import.meta.url),
+        "utf8",
+      ),
+    ).toContain('DROP INDEX IF EXISTS "User_single_admin_idx";');
   });
 
   it("restricts activity position to 1..4", () => {

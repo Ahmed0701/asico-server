@@ -4,7 +4,7 @@ vi.mock("../../../src/core/database/prisma.js", async () => ({
   prisma: (await import("../auth/in-memory-auth.repository.js")).fakePrisma,
 }));
 
-import type { Prisma } from "../../../src/generated/prisma/client.js";
+import { Prisma as PrismaRuntime, type Prisma } from "../../../src/generated/prisma/client.js";
 import { DashboardRepository } from "../../../src/modules/dashboard/repository/dashboard.repository.js";
 import type { DayRange } from "../../../src/modules/dashboard/dto/dashboard.dto.js";
 
@@ -15,9 +15,11 @@ function recorder(rows: unknown[]) {
   const calls: { text: string; values: unknown[] }[] = [];
   const db = {
     $queryRaw: vi.fn(async (query: TemplateStringsArray | Prisma.Sql, ...params: unknown[]) => {
-      const [text, values] = Array.isArray(query)
-        ? [(query as unknown as TemplateStringsArray).join("?"), params]
-        : [(query as Prisma.Sql).sql, (query as Prisma.Sql).values];
+      // A tagged template is flattened as Prisma does it: an embedded Prisma.sql adds its own text and values.
+      const sql = Array.isArray(query)
+        ? PrismaRuntime.sql(query as unknown as TemplateStringsArray, ...params)
+        : (query as Prisma.Sql);
+      const [text, values] = [sql.sql, sql.values];
       calls.push({ text: text.replace(/\s+/g, " ").trim(), values });
       return rows;
     }),

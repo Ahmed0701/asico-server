@@ -428,7 +428,7 @@ describe("remove", () => {
     expect(err).toMatchObject({
       statusCode: 409,
       code: "CIVIL_ENGINEER_HAS_VILLAS",
-      message: "هذا المهندس المدني مرتبط بفلل ولا يمكن حذفه",
+      message: "المهندس المدني هذا لديه فلل: انقلها إلى مهندس آخر قبل الحذف",
     });
     expect(repo.delete).not.toHaveBeenCalled();
     expect(audit.record).not.toHaveBeenCalled();

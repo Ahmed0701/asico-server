@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { andVillaScope, villaScopeConditions } from "../../../core/scope/villa-scope.js";
 import { lockVersion } from "../../../core/concurrency/version.js";
 import { prisma } from "../../../core/database/prisma.js";
 import { Prisma } from "../../../generated/prisma/client.js";
@@ -54,7 +55,8 @@ type ListParams = { filters: DailyLabourFilters; sort: DailyLabourSort; skip: nu
 // are then loaded with findMany and put back in that order. The page and the count share one WHERE. A pattern is
 // escaped, so `%`, `_` and a backslash in a value match themselves.
 function conditionsOf(filters: DailyLabourFilters): Prisma.Sql[] {
-  const conditions: Prisma.Sql[] = [];
+  // Only the villas of the signed-in engineer, when it is one.
+  const conditions: Prisma.Sql[] = [...villaScopeConditions("v")];
   if (filters.villaId) conditions.push(Prisma.sql`r."villaId" = ${filters.villaId}`);
   if (filters.contractorId) conditions.push(Prisma.sql`r."contractorId" = ${filters.contractorId}`);
   if (filters.labourFrom) conditions.push(Prisma.sql`r."labourDate" >= ${toDay(filters.labourFrom)}::date`);
@@ -133,7 +135,7 @@ export class DailyLabourRepository {
   // villa and with a change of its contractor, and not with each other. Null: there is no such villa.
   async lockVillaShared(villaId: string, db: Db): Promise<{ contractorId: string | null } | null> {
     const rows = await db.$queryRaw<{ contractorId: string | null }[]>(
-      Prisma.sql`SELECT "contractorId" FROM "Villa" WHERE "id" = ${villaId} FOR SHARE`,
+      Prisma.sql`SELECT "contractorId" FROM "Villa" WHERE "id" = ${villaId}${andVillaScope("Villa")} FOR SHARE`,
     );
     return rows[0] ?? null;
   }
@@ -200,7 +202,7 @@ export class DailyLabourRepository {
       return new Map();
     }
     const rows = await db.$queryRaw<{ id: string; contractorId: string | null }[]>(
-      Prisma.sql`SELECT "id", "contractorId" FROM "Villa" WHERE "id" IN (${Prisma.join([...villaIds])})
+      Prisma.sql`SELECT "id", "contractorId" FROM "Villa" WHERE "id" IN (${Prisma.join([...villaIds])})${andVillaScope("Villa")}
         ORDER BY "id" FOR SHARE`,
     );
     return new Map(rows.map((row) => [row.id, row.contractorId]));

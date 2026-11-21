@@ -178,6 +178,7 @@ describe("create", () => {
     name: "New Person",
     email: "new@example.test",
     password: "Correct-Horse-9",
+    role: "EMPLOYEE" as const,
     isActive: true,
     permissions: ["villas:read", "contractors:read"] as ("villas:read" | "contractors:read")[],
   };
@@ -259,11 +260,10 @@ describe("create", () => {
     expect(repos.permissions.getUserCodes).not.toHaveBeenCalled();
   });
 
-  it("can create the user inactive, and always as EMPLOYEE", async () => {
+  it("can create the user inactive, as an EMPLOYEE (an engineer) unless an ADMIN is asked for", async () => {
     await service.create(adminActor, { ...input, isActive: false, permissions: [] }, ctx);
 
-    expect(repos.users.createUser.mock.calls[0]?.[0]).toMatchObject({ isActive: false });
-    expect(Object.keys(repos.users.createUser.mock.calls[0]?.[0] as object)).not.toContain("role");
+    expect(repos.users.createUser.mock.calls[0]?.[0]).toMatchObject({ isActive: false, role: "EMPLOYEE" });
   });
 
   it("rejects a taken email with 409 before hashing anything", async () => {

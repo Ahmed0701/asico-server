@@ -5,6 +5,7 @@ import { store } from "../auth/in-memory-auth.repository.js";
 import { idempotencyTable } from "../write-safety/in-memory-idempotency.repository.js";
 import {
   addElectricalEngineer,
+  addVillaForElectrical,
   electricalTables,
   InMemoryElectricalEngineersRepository,
 } from "./in-memory-electrical-engineers.repository.js";
@@ -204,7 +205,18 @@ describe("GET /electrical-engineers", () => {
     expect(names(res)).toEqual(["Alice Nour", "Bob Adel", "Carol Samir", "Dina Fouad", "Eman Zaki"]);
     expect(res.body.meta).toEqual({ page: 1, limit: 20, total: 5, totalPages: 1 });
     expect(Object.keys(res.body.data[0]).sort()).toEqual(
-      ["createdAt", "email", "id", "name", "phone", "status", "updatedAt", "version", "villaCount"].sort(),
+      [
+        "createdAt",
+        "email",
+        "id",
+        "name",
+        "phone",
+        "status",
+        "updatedAt",
+        "user",
+        "version",
+        "villaCount",
+      ].sort(),
     );
     expect(res.body.data[0].createdAt).toBe("2026-01-05T00:00:00.000Z");
     expect(res.body.data[0].version).toBe(1);
@@ -1173,5 +1185,103 @@ describe("email and status", () => {
     expect(reader.body.data).toMatchObject({ email: null, status: "ACTIVE" });
     expect(readerPatch.status).toBe(403);
     expect(updater.status).toBe(200);
+  });
+});
+
+describe("POST /electrical-engineers/:id/transfer-villas", () => {
+  const transfer = (id: string, body: unknown, language = "en", user?: User) =>
+    asUser("post", `/${id}/transfer-villas`, { language, body, user: user ?? admin });
+
+  it("moves every villa to the other engineer, audits it and answers how many moved", async () => {
+    const from = addElectricalEngineer({ name: "Leaving" });
+    const to = addElectricalEngineer({ name: "Taking Over" });
+    const other = addElectricalEngineer({ name: "Other" });
+    addVillaForElectrical(from.id, 3);
+    addVillaForElectrical(other.id);
+
+    const res = await transfer(from.id, { toEngineerId: to.id });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ data: { moved: 3, to: { id: to.id, name: "Taking Over" } } });
+    expect(electricalTables.villaRefs.filter((ref) => ref.engineerId === to.id)).toHaveLength(3);
+    expect(electricalTables.villaRefs.filter((ref) => ref.engineerId === from.id)).toHaveLength(0);
+    expect(electricalTables.villaRefs.filter((ref) => ref.engineerId === other.id)).toHaveLength(1);
+    expect(auditRows()).toHaveLength(1);
+    expect(auditRows()[0]).toMatchObject({
+      action: "electrical_engineer.transfer_villas",
+      entityId: from.id,
+      actorId: admin.id,
+      after: { from: "Leaving", to: "Taking Over", moved: 3 },
+    });
+  });
+
+  it("then lets the engineer be deleted", async () => {
+    const from = addElectricalEngineer({ name: "Leaving" });
+    const to = addElectricalEngineer({ name: "Taking Over" });
+    addVillaForElectrical(from.id, 2);
+
+    expect((await transfer(from.id, { toEngineerId: to.id })).status).toBe(200);
+    expect((await asAdmin("delete", `/${from.id}`)).status).toBe(204);
+  });
+
+  it("answers 0 moved for an engineer with no villas", async () => {
+    const from = addElectricalEngineer({ name: "Empty" });
+    const to = addElectricalEngineer({ name: "Taking Over" });
+
+    const res = await transfer(from.id, { toEngineerId: to.id });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.moved).toBe(0);
+  });
+
+  it("refuses the same engineer (422), an inactive one (400) and an unknown one (404), moving nothing", async () => {
+    const from = addElectricalEngineer({ name: "Leaving" });
+    const off = addElectricalEngineer({ name: "Off", status: "INACTIVE" });
+    addVillaForElectrical(from.id, 2);
+
+    const same = await transfer(from.id, { toEngineerId: from.id }, "ar");
+    expect(same.status).toBe(422);
+    expect(same.body).toMatchObject({
+      code: "TRANSFER_SAME_ENGINEER",
+      message: "اختر مهندسًا آخر لنقل الفلل إليه",
+    });
+    const inactive = await transfer(from.id, { toEngineerId: off.id });
+    expect(inactive.status).toBe(400);
+    expect(inactive.body.code).toBe("ELECTRICAL_ENGINEER_INACTIVE");
+    expect((await transfer(from.id, { toEngineerId: MISSING_ID })).body.code).toBe(
+      "ELECTRICAL_ENGINEER_NOT_FOUND",
+    );
+    expect((await transfer(MISSING_ID, { toEngineerId: off.id })).body.code).toBe(
+      "ELECTRICAL_ENGINEER_NOT_FOUND",
+    );
+
+    expect(electricalTables.villaRefs.filter((ref) => ref.engineerId === from.id)).toHaveLength(2);
+    expect(auditRows()).toHaveLength(0);
+  });
+
+  it("validates the id and the body (400)", async () => {
+    const from = addElectricalEngineer({ name: "Leaving" });
+    expect((await transfer("nope", { toEngineerId: from.id })).status).toBe(400);
+    expect((await transfer(from.id, {})).status).toBe(400);
+    expect((await transfer(from.id, { toEngineerId: "x" })).status).toBe(400);
+    expect((await transfer(from.id, { toEngineerId: MISSING_ID, extra: 1 })).status).toBe(400);
+  });
+
+  it("needs villas:update", async () => {
+    const from = addElectricalEngineer({ name: "Leaving" });
+    const to = addElectricalEngineer({ name: "Taking Over" });
+    addVillaForElectrical(from.id);
+
+    expect((await call("post", `/${from.id}/transfer-villas`).send({ toEngineerId: to.id })).status).toBe(
+      401,
+    );
+    const reader = employee(
+      "reader@example.test",
+      "electrical-engineers:read",
+      "electrical-engineers:update",
+    );
+    expect((await transfer(from.id, { toEngineerId: to.id }, "en", reader)).status).toBe(403);
+    const editor = employee("editor@example.test", "villas:update");
+    expect((await transfer(from.id, { toEngineerId: to.id }, "en", editor)).status).toBe(200);
   });
 });

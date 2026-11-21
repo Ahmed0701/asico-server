@@ -12,11 +12,15 @@ export const listElectricalEngineersQuerySchema = paginationQuerySchema.extend({
   status: partyStatus.optional(),
 });
 
+// The user account to link (null: none).
+const userId = z.uuid({ error: "validation.idInvalid" }).nullable();
+
 export const createElectricalEngineerSchema = z.strictObject({
   name,
   phone,
   email: contactEmail.optional(),
   status: partyStatus.optional(),
+  userId: userId.optional(),
 });
 
 export const updateElectricalEngineerSchema = z
@@ -25,9 +29,17 @@ export const updateElectricalEngineerSchema = z
     phone: phone.optional(),
     email: contactEmail.optional(),
     status: partyStatus.optional(),
+    userId: userId.optional(),
   })
   .refine(hasAnyField, { error: "validation.atLeastOneField" });
 
 export type ListElectricalEngineersQuery = z.output<typeof listElectricalEngineersQuerySchema>;
 export type CreateElectricalEngineerInput = z.output<typeof createElectricalEngineerSchema>;
 export type UpdateElectricalEngineerInput = z.output<typeof updateElectricalEngineerSchema>;
+
+// Moves every villa of the engineer to another one.
+export const transferVillasSchema = z.strictObject({
+  toEngineerId: z.uuid({ error: "validation.idInvalid" }),
+});
+
+export type TransferVillasInput = z.output<typeof transferVillasSchema>;

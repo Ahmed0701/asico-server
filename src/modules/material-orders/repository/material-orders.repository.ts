@@ -1,4 +1,5 @@
 import { prisma } from "../../../core/database/prisma.js";
+import { villaIdScopeConditions } from "../../../core/scope/villa-scope.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import type { FactoryTypeValue } from "../../../shared/constants/enums.js";
 import { escapeLike } from "../../../shared/query/where.js";
@@ -89,7 +90,8 @@ const ROWS = (today: Date) => Prisma.sql`
   )`;
 
 function whereOf(f: MaterialOrderFilters): Prisma.Sql {
-  const conditions: Prisma.Sql[] = [Prisma.sql`TRUE`];
+  // Only the villas of the signed-in engineer, when it is one.
+  const conditions: Prisma.Sql[] = [Prisma.sql`TRUE`, ...villaIdScopeConditions('s."villaId"')];
   if (f.villaId) conditions.push(Prisma.sql`s."villaId" = ${f.villaId}`);
   if (f.type) conditions.push(Prisma.sql`s."type" = ${f.type}::"FactoryType"`);
   if (f.status) conditions.push(Prisma.sql`s."status" = ${f.status}`);

@@ -70,11 +70,12 @@ export class InMemoryUsersRepository implements UsersRepository {
     email: string;
     passwordHash: string;
     isActive: boolean;
+    role?: "ADMIN" | "EMPLOYEE";
   }): Promise<User> {
     if (store.users.some((user) => user.email === data.email)) {
       throw uniqueViolation();
     }
-    return { ...store.addUser({ ...data, role: "EMPLOYEE" }) };
+    return { ...store.addUser({ ...data, role: data.role ?? "EMPLOYEE" }) };
   }
 
   async updateUser(
@@ -99,6 +100,19 @@ export class InMemoryUsersRepository implements UsersRepository {
     return { ...user };
   }
 
+  async setRole(id: string, version: number, role: "ADMIN" | "EMPLOYEE"): Promise<User | null> {
+    const user = store.users.find((candidate) => candidate.id === id);
+    if (!user) {
+      throw new Error("not found");
+    }
+    if (user.version !== version) {
+      return null;
+    }
+    user.role = role;
+    user.version += 1;
+    return { ...user };
+  }
+
   async setActive(id: string, version: number, isActive: boolean): Promise<User | null> {
     const user = store.users.find((candidate) => candidate.id === id);
     if (!user) {
@@ -110,6 +124,11 @@ export class InMemoryUsersRepository implements UsersRepository {
     user.isActive = isActive;
     user.version += 1;
     return { ...user };
+  }
+
+  // Engineers live elsewhere; these tests link none.
+  async linkedEngineer(): Promise<{ name: string; villas: number } | null> {
+    return null;
   }
 
   async countAuthoredRecords(id: string): Promise<number> {

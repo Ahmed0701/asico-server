@@ -42,6 +42,7 @@ function row(
     version: 1,
     createdAt: CREATED,
     updatedAt: UPDATED,
+    user: null,
     _count: { villas, dailyReports },
     ...overrides,
   };
@@ -113,6 +114,7 @@ describe("list", () => {
       phone: "+20 100 123 4567",
       email: null,
       status: "ACTIVE",
+      user: null,
       villaCount: 3,
       version: 1,
       createdAt: "2026-03-04T05:06:07.890Z",
@@ -223,7 +225,7 @@ describe("create", () => {
     const dto = await service.create(actor, { name: "Omar Khaled", phone: "0100 123 4567" }, ctx);
 
     expect(repo.create).toHaveBeenCalledWith(
-      { name: "Omar Khaled", phone: "0100 123 4567", email: null, status: "ACTIVE" },
+      { name: "Omar Khaled", phone: "0100 123 4567", email: null, status: "ACTIVE", userId: null },
       tx,
     );
     expect(dto).toMatchObject({ id: "new-eng", version: 1, email: null, status: "ACTIVE" });
@@ -250,7 +252,13 @@ describe("create", () => {
     );
 
     expect(repo.create).toHaveBeenCalledWith(
-      { name: "Omar Khaled", phone: "0100 123 4567", email: "omar@example.test", status: "INACTIVE" },
+      {
+        name: "Omar Khaled",
+        phone: "0100 123 4567",
+        email: "omar@example.test",
+        status: "INACTIVE",
+        userId: null,
+      },
       tx,
     );
     expect(dto).toMatchObject({ email: "omar@example.test", status: "INACTIVE" });
@@ -271,7 +279,7 @@ describe("create", () => {
     await service.create(actor, input, ctx);
 
     expect(repo.create).toHaveBeenCalledWith(
-      { name: "Omar Khaled", phone: "0100 123 4567", email: null, status: "ACTIVE" },
+      { name: "Omar Khaled", phone: "0100 123 4567", email: null, status: "ACTIVE", userId: null },
       tx,
     );
   });
@@ -510,7 +518,7 @@ describe("remove", () => {
       expect(err).toMatchObject({
         statusCode: 409,
         code: "ELECTRICAL_ENGINEER_IN_USE",
-        message: "مهندس الكهرباء هذا مرتبط بفلل أو بتقارير يومية ولا يمكن حذفه",
+        message: "مهندس الكهرباء هذا لديه فلل أو تقارير يومية: انقل الفلل إلى مهندس آخر قبل الحذف",
       });
       expect(repo.delete).not.toHaveBeenCalled();
       expect(audit.record).not.toHaveBeenCalled();

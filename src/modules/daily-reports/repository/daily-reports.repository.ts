@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { currentVillaScope, ownEngineerSql } from "../../../core/scope/villa-scope.js";
 import { lockVersion } from "../../../core/concurrency/version.js";
 import { prisma } from "../../../core/database/prisma.js";
 import { Prisma } from "../../../generated/prisma/client.js";
@@ -57,7 +58,8 @@ type ListParams = { filters: DailyReportFilters; sort: DailyReportSort; skip: nu
 // one WHERE. A pattern is escaped, so `%`, `_` and a backslash in a value match themselves. The enum travels as text, so it is
 // cast. The search looks at the notes only, which the trigram index serves.
 function conditionsOf(filters: DailyReportFilters): Prisma.Sql[] {
-  const conditions: Prisma.Sql[] = [];
+  // A signed-in engineer sees the reports it prepared.
+  const conditions: Prisma.Sql[] = currentVillaScope() ? [ownEngineerSql('r."preparedByEngineerId"')] : [];
   if (filters.contractorId) conditions.push(Prisma.sql`r."contractorId" = ${filters.contractorId}`);
   if (filters.preparedByEngineerId) {
     conditions.push(Prisma.sql`r."preparedByEngineerId" = ${filters.preparedByEngineerId}`);

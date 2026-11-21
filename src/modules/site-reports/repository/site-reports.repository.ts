@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { andVillaScope, villaScopeConditions } from "../../../core/scope/villa-scope.js";
 import { lockVersion } from "../../../core/concurrency/version.js";
 import { prisma } from "../../../core/database/prisma.js";
 import { Prisma } from "../../../generated/prisma/client.js";
@@ -60,7 +61,8 @@ type ListParams = { filters: SiteReportFilters; sort: SiteReportSort; skip: numb
 // are then loaded with findMany and put back in that order. The page and the count share one WHERE. A pattern is
 // escaped, so `%`, `_` and a backslash in a value match themselves. The enum travels as text, so it is cast.
 function conditionsOf(filters: SiteReportFilters): Prisma.Sql[] {
-  const conditions: Prisma.Sql[] = [];
+  // Only the villas the request may see (its villa scope).
+  const conditions: Prisma.Sql[] = [...villaScopeConditions("v")];
   if (filters.villaId) conditions.push(Prisma.sql`r."villaId" = ${filters.villaId}`);
   if (filters.type) conditions.push(Prisma.sql`r."type" = ${filters.type}::"SiteReportType"`);
   if (filters.rating !== undefined) conditions.push(Prisma.sql`r."rating" = ${filters.rating}`);
@@ -143,7 +145,7 @@ export class SiteReportsRepository {
   // not with each other. False: there is no such villa.
   async lockVillaShared(villaId: string, db: Db): Promise<boolean> {
     const rows = await db.$queryRaw<{ id: string }[]>(
-      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" = ${villaId} FOR SHARE`,
+      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" = ${villaId}${andVillaScope("Villa")} FOR SHARE`,
     );
     return rows.length > 0;
   }
@@ -196,7 +198,7 @@ export class SiteReportsRepository {
       return new Set();
     }
     const rows = await db.$queryRaw<{ id: string }[]>(
-      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" IN (${Prisma.join([...villaIds])}) ORDER BY "id" FOR SHARE`,
+      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" IN (${Prisma.join([...villaIds])})${andVillaScope("Villa")} ORDER BY "id" FOR SHARE`,
     );
     return new Set(rows.map((row) => row.id));
   }

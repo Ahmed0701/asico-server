@@ -3,7 +3,12 @@ import { setVersionHeaders } from "../../../core/concurrency/version.js";
 import { t } from "../../../core/i18n/index.js";
 import { actorOf, contextOf } from "../../../core/middleware/requestContext.js";
 import { UsersService } from "../service/users.service.js";
-import type { CreateUserInput, ListUsersQuery, UpdateUserInput } from "../validators/users.validators.js";
+import type {
+  CreateUserInput,
+  ListUsersQuery,
+  SetUserRoleInput,
+  UpdateUserInput,
+} from "../validators/users.validators.js";
 
 function idOf(req: Request): string {
   return (req.validated.params as { id: string }).id;
@@ -33,6 +38,18 @@ export class UsersController {
       actorOf(req),
       idOf(req),
       req.body as UpdateUserInput,
+      contextOf(req),
+      req.expectedVersion,
+    );
+    setVersionHeaders(res, user.version);
+    res.status(200).json({ data: user });
+  };
+
+  setRole = async (req: Request, res: Response): Promise<void> => {
+    const user = await this.service.setRole(
+      actorOf(req),
+      idOf(req),
+      req.body as SetUserRoleInput,
       contextOf(req),
       req.expectedVersion,
     );

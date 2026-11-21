@@ -114,7 +114,7 @@ describe("auth middleware", () => {
     expect(res.body.user).toEqual({ id: "user-1", role: "EMPLOYEE" });
     expect(db.user.findUnique).toHaveBeenCalledWith({
       where: { id: "user-1" },
-      select: { id: true, role: true, isActive: true },
+      select: { id: true, role: true, isActive: true, electricalEngineer: { select: { id: true } } },
     });
   });
 

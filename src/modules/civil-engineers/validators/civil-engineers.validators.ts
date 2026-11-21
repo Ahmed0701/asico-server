@@ -31,3 +31,10 @@ export const updateCivilEngineerSchema = z
 export type ListCivilEngineersQuery = z.output<typeof listCivilEngineersQuerySchema>;
 export type CreateCivilEngineerInput = z.output<typeof createCivilEngineerSchema>;
 export type UpdateCivilEngineerInput = z.output<typeof updateCivilEngineerSchema>;
+
+// Moves every villa of the engineer to another one.
+export const transferVillasSchema = z.strictObject({
+  toEngineerId: z.uuid({ error: "validation.idInvalid" }),
+});
+
+export type TransferVillasInput = z.output<typeof transferVillasSchema>;

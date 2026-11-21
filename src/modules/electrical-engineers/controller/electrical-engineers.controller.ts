@@ -6,6 +6,7 @@ import type {
   CreateElectricalEngineerInput,
   ListElectricalEngineersQuery,
   UpdateElectricalEngineerInput,
+  TransferVillasInput,
 } from "../validators/electrical-engineers.validators.js";
 
 function idOf(req: Request): string {
@@ -18,6 +19,10 @@ export class ElectricalEngineersController {
   list = async (req: Request, res: Response): Promise<void> => {
     const { items, meta } = await this.service.list(req.validated.query as ListElectricalEngineersQuery);
     res.status(200).json({ data: items, meta });
+  };
+
+  userOptions = async (_req: Request, res: Response): Promise<void> => {
+    res.status(200).json({ data: await this.service.userOptions() });
   };
 
   options = async (_req: Request, res: Response): Promise<void> => {
@@ -49,6 +54,16 @@ export class ElectricalEngineersController {
     );
     setVersionHeaders(res, engineer.version);
     res.status(200).json({ data: engineer });
+  };
+
+  transferVillas = async (req: Request, res: Response): Promise<void> => {
+    const result = await this.service.transferVillas(
+      actorOf(req),
+      idOf(req),
+      req.body as TransferVillasInput,
+      contextOf(req),
+    );
+    res.status(200).json({ data: result });
   };
 
   remove = async (req: Request, res: Response): Promise<void> => {

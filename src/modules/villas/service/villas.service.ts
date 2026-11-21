@@ -1,4 +1,5 @@
 import { audit, withMeta } from "../../../core/audit/audit.js";
+import { currentVillaScope } from "../../../core/scope/villa-scope.js";
 import { assertVersion, versionConflict } from "../../../core/concurrency/version.js";
 import { AppError } from "../../../core/errors/AppError.js";
 import { t, type MessageKey } from "../../../core/i18n/index.js";
@@ -96,6 +97,20 @@ const electricalEngineerNotFound = (ctx: RequestContext): AppError =>
   fail(ctx, 404, "errors.electricalEngineerNotFound", "ELECTRICAL_ENGINEER_NOT_FOUND");
 const contractorNotFound = (ctx: RequestContext): AppError =>
   fail(ctx, 404, "errors.contractorNotFound", "CONTRACTOR_NOT_FOUND");
+const engineerCannotDelete = (ctx: RequestContext): AppError =>
+  fail(ctx, 403, "errors.villaDeleteByEngineer", "FORBIDDEN");
+const engineerOutOfScope = (ctx: RequestContext): AppError =>
+  fail(ctx, 422, "errors.villaEngineerOutOfScope", "VILLA_ENGINEER_OUT_OF_SCOPE");
+
+// A signed-in electrical engineer's villas are its own: a villa it adds goes to it (when it names no engineer), and it
+// cannot give one to another engineer or take its own off it, or the villa would leave its sight.
+function ownEngineerOf(requested: string | null | undefined, ctx: RequestContext): string | null | undefined {
+  const scope = currentVillaScope();
+  if (!scope) return requested;
+  if (requested === undefined || requested === null || requested === "") return scope.engineerId;
+  if (requested !== scope.engineerId) throw engineerOutOfScope(ctx);
+  return requested;
+}
 
 // Open works that people typed in for the villa, and any daily report, daily small work or site report, stop its deletion: they decide
 // first. The automatic open works go with it.
@@ -269,7 +284,8 @@ export class VillasService {
     return toDetailDto(row);
   }
 
-  async create(actor: Actor, input: CreateVillaInput, ctx: RequestContext): Promise<VillaListItemDto> {
+  async create(actor: Actor, given: CreateVillaInput, ctx: RequestContext): Promise<VillaListItemDto> {
+    const input = { ...given, electricalEngineerId: ownEngineerOf(given.electricalEngineerId, ctx) };
     await this.requireArea(input.areaId, ctx);
     await this.requireActiveCivilEngineer(input.civilEngineerId, ctx);
     if (input.electricalEngineerId) {
@@ -329,6 +345,9 @@ export class VillasService {
     ctx: RequestContext,
     expectedVersion?: number,
   ): Promise<VillaListItemDto> {
+    if (input.electricalEngineerId !== undefined) {
+      input = { ...input, electricalEngineerId: ownEngineerOf(input.electricalEngineerId, ctx) };
+    }
     try {
       const updated = await this.repository.transaction(async (tx) => {
         // Everything the update depends on is read after the row is locked, so it cannot change underneath it.
@@ -629,6 +648,8 @@ export class VillasService {
   }
 
   async remove(actor: Actor, id: string, ctx: RequestContext, expectedVersion?: number): Promise<void> {
+    // A user linked to an electrical engineer may change its villas, never delete one, whatever it was granted.
+    if (currentVillaScope()) throw engineerCannotDelete(ctx);
     try {
       await this.repository.transaction(async (tx) => {
         const { snapshot: row, version } = await this.lock(id, expectedVersion, ctx, tx);

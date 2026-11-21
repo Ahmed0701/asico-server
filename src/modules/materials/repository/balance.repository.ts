@@ -1,4 +1,5 @@
 import { prisma } from "../../../core/database/prisma.js";
+import { villaIdScopeConditions } from "../../../core/scope/villa-scope.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import type { FactoryTypeValue } from "../../../shared/constants/enums.js";
 import { escapeLike } from "../../../shared/query/where.js";
@@ -64,7 +65,11 @@ const PAIRS = Prisma.sql`
   )`;
 
 function whereOf(f: BalanceFilters): Prisma.Sql {
-  const conditions: Prisma.Sql[] = [Prisma.sql`(p."required" > 0 OR p."delivered" > 0)`];
+  const conditions: Prisma.Sql[] = [
+    Prisma.sql`(p."required" > 0 OR p."delivered" > 0)`,
+    // Only the villas of the signed-in engineer, when it is one.
+    ...villaIdScopeConditions('p."villaId"'),
+  ];
   if (f.villaId) conditions.push(Prisma.sql`p."villaId" = ${f.villaId}`);
   if (f.itemId) conditions.push(Prisma.sql`p."itemId" = ${f.itemId}`);
   if (f.type) conditions.push(Prisma.sql`p."type" = ${f.type}::"FactoryType"`);

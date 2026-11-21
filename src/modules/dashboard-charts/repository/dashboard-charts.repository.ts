@@ -1,4 +1,5 @@
 import { prisma } from "../../../core/database/prisma.js";
+import { andVillaIdScope } from "../../../core/scope/villa-scope.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 
 export type Db = Prisma.TransactionClient;
@@ -37,7 +38,7 @@ export class DashboardChartsRepository {
       Prisma.sql`SELECT to_char(date_trunc('month', "paidDate"), 'YYYY-MM') AS "month",
           COALESCE(sum("amountMinor"), 0)::bigint AS "paid"
         FROM "ContractorPayment"
-        WHERE "status" = 'PAID' AND "paidDate" >= ${from}::date
+        WHERE "status" = 'PAID' AND "paidDate" >= ${from}::date${andVillaIdScope('"villaId"')}
         GROUP BY 1`,
     );
   }

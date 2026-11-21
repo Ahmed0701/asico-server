@@ -1,6 +1,6 @@
 import { lockVersion } from "../../../core/concurrency/version.js";
 import { prisma } from "../../../core/database/prisma.js";
-import type { Prisma, User } from "../../../generated/prisma/client.js";
+import type { Prisma, Role, User } from "../../../generated/prisma/client.js";
 import { cleanWhere, escapeLike } from "../../../shared/query/where.js";
 import type { UserFilters, UserSort } from "../dto/users.dto.js";
 
@@ -63,12 +63,12 @@ export class UsersRepository {
     return db.user.findUnique({ where: { email } });
   }
 
-  // Role is fixed here on purpose: the single ADMIN is created by the seed, never through the API.
+  // An EMPLOYEE (an engineer) unless an ADMIN asked for another ADMIN (the service checks who asks).
   createUser(
-    data: { name: string; email: string; passwordHash: string; isActive: boolean },
+    data: { name: string; email: string; passwordHash: string; isActive: boolean; role?: Role },
     db: Db = prisma,
   ): Promise<User> {
-    return db.user.create({ data: { ...data, role: "EMPLOYEE" } });
+    return db.user.create({ data: { ...data, role: data.role ?? "EMPLOYEE" } });
   }
 
   // Locks the row for the rest of the transaction and returns its version (null: no such user).
@@ -90,6 +90,15 @@ export class UsersRepository {
     return count === 1 ? db.user.findUnique({ where: { id } }) : null;
   }
 
+  // Compare-and-set, as updateUser. Null: the row moved on.
+  async setRole(id: string, version: number, role: Role, db: Db = prisma): Promise<User | null> {
+    const { count } = await db.user.updateMany({
+      where: { id, version },
+      data: { role, version: { increment: 1 } },
+    });
+    return count === 1 ? db.user.findUnique({ where: { id } }) : null;
+  }
+
   async setActive(id: string, version: number, isActive: boolean, db: Db = prisma): Promise<User | null> {
     const { count } = await db.user.updateMany({
       where: { id, version },
@@ -105,6 +114,15 @@ export class UsersRepository {
       db.villaDocument.count({ where: { uploadedById: id } }),
     ]);
     return villas + documents;
+  }
+
+  // The electrical engineer this user is the account of, with how many villas it still has; null when none.
+  async linkedEngineer(id: string, db: Db = prisma): Promise<{ name: string; villas: number } | null> {
+    const engineer = await db.electricalEngineer.findUnique({
+      where: { userId: id },
+      select: { name: true, _count: { select: { villas: true } } },
+    });
+    return engineer ? { name: engineer.name, villas: engineer._count.villas } : null;
   }
 
   // Compare-and-set on the version. Their permissions, sessions and notifications go with them (ON DELETE CASCADE); the

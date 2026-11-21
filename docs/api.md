@@ -49,6 +49,7 @@ All paths are under `/api/v1`. A test (`tests/docs/routes.docs.test.ts`) reads t
 | `GET`    | `/users/:id`                | `users:read`         | —               | —        | One user                                                                                                                     |
 | `POST`   | `/users`                    | `users:create`       | optional        | —        | Create an EMPLOYEE; granting `permissions` in the same request needs `permissions:assign` too                                |
 | `PATCH`  | `/users/:id`                | `users:update`       | —               | optional | Change a user's name or email                                                                                                |
+| `PATCH`  | `/users/:id/role`           | `users:update`       | —               | optional | Make a user an ADMIN or an EMPLOYEE (an engineer), by an ADMIN only; never yourself                                                            |
 | `POST`   | `/users/:id/reset-password` | `users:update`       | optional        | —        | Email a user a reset link and sign out all their sessions                                                                    |
 | `PATCH`  | `/users/:id/activate`       | `users:deactivate`   | —               | optional | Re-activate a user                                                                                                           |
 | `PATCH`  | `/users/:id/deactivate`     | `users:deactivate`   | —               | optional | Deactivate a user and revoke their sessions (not an ADMIN, not yourself)                                                     |
@@ -67,17 +68,20 @@ All paths are under `/api/v1`. A test (`tests/docs/routes.docs.test.ts`) reads t
 | `POST`   | `/civil-engineers`         | `civil-engineers:create` | optional        | —        | Create a civil engineer                           |
 | `PATCH`  | `/civil-engineers/:id`     | `civil-engineers:update` | —               | optional | Change a civil engineer                           |
 | `DELETE` | `/civil-engineers/:id`     | `civil-engineers:delete` | —               | optional | Delete a civil engineer                           |
+| `POST`   | `/civil-engineers/:id/transfer-villas` | `villas:update` | —   | —        | Move every villa of the engineer to another one   |
 
 ### Electrical engineers
 
-| Method   | Path                            | Access                        | Idempotency-Key | If-Match | Purpose                                                |
-| -------- | ------------------------------- | ----------------------------- | --------------- | -------- | ------------------------------------------------------ |
-| `GET`    | `/electrical-engineers`         | `electrical-engineers:read`   | —               | —        | List electrical engineers (page, filters, sort)        |
-| `GET`    | `/electrical-engineers/options` | `electrical-engineers:read`   | —               | —        | Id and name of every electrical engineer, for a picker |
-| `GET`    | `/electrical-engineers/:id`     | `electrical-engineers:read`   | —               | —        | One electrical engineer                                |
-| `POST`   | `/electrical-engineers`         | `electrical-engineers:create` | optional        | —        | Create an electrical engineer                          |
-| `PATCH`  | `/electrical-engineers/:id`     | `electrical-engineers:update` | —               | optional | Change an electrical engineer                          |
-| `DELETE` | `/electrical-engineers/:id`     | `electrical-engineers:delete` | —               | optional | Delete an electrical engineer                          |
+| Method   | Path                                 | Access                        | Idempotency-Key | If-Match | Purpose                                                                             |
+| -------- | ------------------------------------ | ----------------------------- | --------------- | -------- | ----------------------------------------------------------------------------------- |
+| `GET`    | `/electrical-engineers`              | `electrical-engineers:read`   | —               | —        | List electrical engineers (page, filters, sort)                                     |
+| `GET`    | `/electrical-engineers/options`      | `electrical-engineers:read`   | —               | —        | Id and name of every electrical engineer, for a picker                              |
+| `GET`    | `/electrical-engineers/user-options` | `electrical-engineers:update` | —               | —        | The users an engineer can be linked to (not ADMINs), with the engineer each has now |
+| `GET`    | `/electrical-engineers/:id`          | `electrical-engineers:read`   | —               | —        | One electrical engineer                                                             |
+| `POST`   | `/electrical-engineers`              | `electrical-engineers:create` | optional        | —        | Create an electrical engineer                                                       |
+| `PATCH`  | `/electrical-engineers/:id`          | `electrical-engineers:update` | —               | optional | Change an electrical engineer                                                       |
+| `DELETE` | `/electrical-engineers/:id`          | `electrical-engineers:delete` | —               | optional | Delete an electrical engineer                                                       |
+| `POST`   | `/electrical-engineers/:id/transfer-villas` | `villas:update`  | —               | —        | Move every villa of the engineer to another one (not by an engineer's own account) |
 
 ### Electrical phases
 
@@ -192,10 +196,10 @@ Deliveries from the switchgear and cable factories to the villas, each with its 
 | `GET`    | `/villas`                              | `villas:read`       | —               | —        | List villas (page, filters, sort)                                                                        |
 | `GET`    | `/villas/options`                      | `villas:read`       | —               | —        | Id and villa number of every villa, for a picker                                                         |
 | `GET`    | `/villas/filters`                      | `villas:read`       | —               | —        | The areas and blocks the villa filters offer                                                             |
-| `GET`    | `/villas/import/template`              | `villas:import`     | —               | —        | The empty villas import file, with an example row                                                        |
-| `POST`   | `/villas/import`                       | `villas:import`     | required        | —        | Import villas from a spreadsheet (`?dryRun=true` only checks)                                            |
+| `GET`    | `/villas/import/template`              | `villas:import`     | —               | —        | The empty villas import file, with an example row (ADMIN only, even with the permission)                 |
+| `POST`   | `/villas/import`                       | `villas:import`     | required        | —        | Import villas from a spreadsheet (`?dryRun=true` only checks) (ADMIN only, even with the permission)     |
 | `GET`    | `/villas/:id`                          | `villas:detail`     | —               | —        | One villa in full: its parties, its phases and their progress                                            |
-| `POST`   | `/villas`                              | `villas:create`     | optional        | —        | Create a villa                                                                                           |
+| `POST`   | `/villas`                              | `villas:create`     | optional        | —        | Create a villa (ADMIN only, even with the permission)                                                    |
 | `PATCH`  | `/villas/:id`                          | `villas:update`     | —               | optional | Change a villa                                                                                           |
 | `POST`   | `/villas/:id/mew-follow-up`            | `villas:inspection` | optional        | optional | Put a villa on MEW follow up (409 if it already is)                                                      |
 | `DELETE` | `/villas/:id/mew-follow-up`            | `villas:inspection` | optional        | optional | Take a villa off MEW follow up (409 if it is not on it); resets its MEW states and inspection day        |

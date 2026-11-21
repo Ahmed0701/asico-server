@@ -1,4 +1,5 @@
 import { MonthlyProgressRepository } from "../repository/monthly-progress.repository.js";
+import { withoutVillaScope } from "../../../core/scope/villa-scope.js";
 import { eventsByWork, villaProgressFromWorks, worksAt } from "./progress-history.js";
 
 // How long a past instant's figures are kept. They hardly change: the audit log is append-only and every event after
@@ -46,7 +47,8 @@ export class ProgressHistory {
     }
     const missing = instants.filter((instant) => !cache.has(instant.toISOString()));
     if (missing.length > 0) {
-      const data = this.load();
+      // The cache is shared by every request: it is read for every villa, whoever asked first.
+      const data = withoutVillaScope(() => this.load());
       for (const instant of missing) {
         const key = instant.toISOString();
         const value = data.then((d) => villaProgressFromWorks(worksAt(instant, d.works, d.byWork), d.phases));

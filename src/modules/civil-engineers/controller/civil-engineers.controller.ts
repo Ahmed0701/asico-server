@@ -6,6 +6,7 @@ import type {
   CreateCivilEngineerInput,
   ListCivilEngineersQuery,
   UpdateCivilEngineerInput,
+  TransferVillasInput,
 } from "../validators/civil-engineers.validators.js";
 
 function idOf(req: Request): string {
@@ -49,6 +50,16 @@ export class CivilEngineersController {
     );
     setVersionHeaders(res, engineer.version);
     res.status(200).json({ data: engineer });
+  };
+
+  transferVillas = async (req: Request, res: Response): Promise<void> => {
+    const result = await this.service.transferVillas(
+      actorOf(req),
+      idOf(req),
+      req.body as TransferVillasInput,
+      contextOf(req),
+    );
+    res.status(200).json({ data: result });
   };
 
   remove = async (req: Request, res: Response): Promise<void> => {

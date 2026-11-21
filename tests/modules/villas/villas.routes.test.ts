@@ -209,6 +209,11 @@ describe("access control", () => {
       .set(await as(employee("e@example.test", needed)))
       .send({});
 
+    // Adding a villa is for an administrator only, whatever an employee was granted.
+    if (verb === "post" && path === "") {
+      expect(res.status).toBe(403);
+      return;
+    }
     expect([401, 403]).not.toContain(res.status);
   });
 
@@ -885,12 +890,14 @@ describe("POST /villas", () => {
     expect(res.body.data).not.toHaveProperty("createdBy");
   });
 
-  it("works for a caller with only villas:create, who holds no engineer or contractor permission", async () => {
+  it("is refused to an employee even with villas:create: only an administrator adds villas", async () => {
     const res = await call("post", "")
       .set(await as(employee("creator@example.test", "villas:create")))
+      .set("Accept-Language", "en")
       .send({ ...body(), contractorId: conA.id });
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchObject({ code: "FORBIDDEN", message: "Only an administrator can add villas" });
   });
 
   it("writes the audit row in the same transaction, with the full new snapshot", async () => {

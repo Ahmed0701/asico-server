@@ -151,6 +151,19 @@ export class InMemoryCivilEngineersRepository implements CivilEngineersRepositor
     return toRow(addEngineer({ ...data, createdAt: now, updatedAt: now }));
   }
 
+  async villaNumbersOf(id: string): Promise<string[]> {
+    return engineerTables.villaRefs.filter((ref) => ref.engineerId === id).map((_, i) => `V-${i + 1}`);
+  }
+
+  // A new array, so a rolled-back transaction gets the old one back.
+  async moveVillas(fromId: string, toId: string): Promise<number> {
+    const moved = engineerTables.villaRefs.filter((ref) => ref.engineerId === fromId).length;
+    engineerTables.villaRefs = engineerTables.villaRefs.map((ref) =>
+      ref.engineerId === fromId ? { engineerId: toId } : ref,
+    );
+    return moved;
+  }
+
   async lockVersion(id: string): Promise<number | null> {
     return engineerTables.engineers.find((candidate) => candidate.id === id)?.version ?? null;
   }

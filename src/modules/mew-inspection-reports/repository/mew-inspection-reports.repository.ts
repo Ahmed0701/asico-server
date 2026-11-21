@@ -1,4 +1,5 @@
 import { prisma } from "../../../core/database/prisma.js";
+import { andVillaScope } from "../../../core/scope/villa-scope.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 
 export type Db = Prisma.TransactionClient;
@@ -40,7 +41,7 @@ export class MewInspectionReportsRepository {
   // Locks the villa for the rest of the transaction, so two uploads of its report take turns. False: no such villa.
   async lockVilla(villaId: string, db: Db): Promise<boolean> {
     const rows = await db.$queryRaw<{ id: string }[]>(
-      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" = ${villaId} FOR UPDATE`,
+      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" = ${villaId}${andVillaScope("Villa")} FOR UPDATE`,
     );
     return rows.length > 0;
   }

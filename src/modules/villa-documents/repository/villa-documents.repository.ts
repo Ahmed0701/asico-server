@@ -1,4 +1,5 @@
 import { prisma } from "../../../core/database/prisma.js";
+import { andVillaScope } from "../../../core/scope/villa-scope.js";
 import type { Prisma } from "../../../generated/prisma/client.js";
 
 export type Db = Prisma.TransactionClient;
@@ -51,7 +52,7 @@ export class VillaDocumentsRepository {
   async lockVilla(villaId: string, db: Db): Promise<boolean> {
     const rows = await db.$queryRaw<
       { id: string }[]
-    >`SELECT "id" FROM "Villa" WHERE "id" = ${villaId} FOR UPDATE`;
+    >`SELECT "id" FROM "Villa" WHERE "id" = ${villaId}${andVillaScope("Villa")} FOR UPDATE`;
     return rows.length > 0;
   }
 

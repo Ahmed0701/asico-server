@@ -536,7 +536,7 @@ describe("DELETE /civil-engineers/:id", () => {
     expect(res.status).toBe(409);
     expect(res.body).toMatchObject({
       code: "CIVIL_ENGINEER_HAS_VILLAS",
-      message: "هذا المهندس المدني مرتبط بفلل ولا يمكن حذفه",
+      message: "المهندس المدني هذا لديه فلل: انقلها إلى مهندس آخر قبل الحذف",
     });
     expect(engineerTables.engineers).toHaveLength(1);
     expect(auditRows()).toHaveLength(0);
@@ -945,5 +945,101 @@ describe("email and status", () => {
     expect(reader.body.data).toMatchObject({ email: null, status: "ACTIVE" });
     expect(readerPatch.status).toBe(403);
     expect(updater.status).toBe(200);
+  });
+});
+
+describe("POST /civil-engineers/:id/transfer-villas", () => {
+  const transfer = (id: string, body: unknown, language = "en", user?: User) =>
+    (async () =>
+      call("post", `/${id}/transfer-villas`)
+        .set(await as(user ?? admin))
+        .set("Accept-Language", language)
+        .send(body as object))();
+
+  it("moves every villa to the other engineer, audits it and answers how many moved", async () => {
+    const from = addEngineer({ name: "Leaving" });
+    const to = addEngineer({ name: "Taking Over" });
+    const other = addEngineer({ name: "Other" });
+    addVillaFor(from.id, 3);
+    addVillaFor(other.id);
+
+    const res = await transfer(from.id, { toEngineerId: to.id });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ data: { moved: 3, to: { id: to.id, name: "Taking Over" } } });
+    expect(engineerTables.villaRefs.filter((ref) => ref.engineerId === to.id)).toHaveLength(3);
+    expect(engineerTables.villaRefs.filter((ref) => ref.engineerId === from.id)).toHaveLength(0);
+    expect(engineerTables.villaRefs.filter((ref) => ref.engineerId === other.id)).toHaveLength(1);
+    expect(auditRows()).toHaveLength(1);
+    expect(auditRows()[0]).toMatchObject({
+      action: "civil_engineer.transfer_villas",
+      entityId: from.id,
+      actorId: admin.id,
+      after: { from: "Leaving", to: "Taking Over", moved: 3 },
+    });
+  });
+
+  it("then lets the engineer be deleted", async () => {
+    const from = addEngineer({ name: "Leaving" });
+    const to = addEngineer({ name: "Taking Over" });
+    addVillaFor(from.id, 2);
+
+    expect((await transfer(from.id, { toEngineerId: to.id })).status).toBe(200);
+    expect((await asAdmin("delete", `/${from.id}`)).status).toBe(204);
+  });
+
+  it("answers 0 moved for an engineer with no villas", async () => {
+    const from = addEngineer({ name: "Empty" });
+    const to = addEngineer({ name: "Taking Over" });
+
+    const res = await transfer(from.id, { toEngineerId: to.id });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.moved).toBe(0);
+  });
+
+  it("refuses the same engineer (422), an inactive one (400) and an unknown one (404), moving nothing", async () => {
+    const from = addEngineer({ name: "Leaving" });
+    const off = addEngineer({ name: "Off", status: "INACTIVE" });
+    addVillaFor(from.id, 2);
+
+    const same = await transfer(from.id, { toEngineerId: from.id }, "ar");
+    expect(same.status).toBe(422);
+    expect(same.body).toMatchObject({
+      code: "TRANSFER_SAME_ENGINEER",
+      message: "اختر مهندسًا آخر لنقل الفلل إليه",
+    });
+    const inactive = await transfer(from.id, { toEngineerId: off.id });
+    expect(inactive.status).toBe(400);
+    expect(inactive.body.code).toBe("CIVIL_ENGINEER_INACTIVE");
+    expect((await transfer(from.id, { toEngineerId: MISSING_ID })).body.code).toBe(
+      "CIVIL_ENGINEER_NOT_FOUND",
+    );
+    expect((await transfer(MISSING_ID, { toEngineerId: off.id })).body.code).toBe("CIVIL_ENGINEER_NOT_FOUND");
+
+    expect(engineerTables.villaRefs.filter((ref) => ref.engineerId === from.id)).toHaveLength(2);
+    expect(auditRows()).toHaveLength(0);
+  });
+
+  it("validates the id and the body (400)", async () => {
+    const from = addEngineer({ name: "Leaving" });
+    expect((await transfer("nope", { toEngineerId: from.id })).status).toBe(400);
+    expect((await transfer(from.id, {})).status).toBe(400);
+    expect((await transfer(from.id, { toEngineerId: "x" })).status).toBe(400);
+    expect((await transfer(from.id, { toEngineerId: MISSING_ID, extra: 1 })).status).toBe(400);
+  });
+
+  it("needs villas:update", async () => {
+    const from = addEngineer({ name: "Leaving" });
+    const to = addEngineer({ name: "Taking Over" });
+    addVillaFor(from.id);
+
+    expect((await call("post", `/${from.id}/transfer-villas`).send({ toEngineerId: to.id })).status).toBe(
+      401,
+    );
+    const reader = employee("reader@example.test", "civil-engineers:read", "civil-engineers:update");
+    expect((await transfer(from.id, { toEngineerId: to.id }, "en", reader)).status).toBe(403);
+    const editor = employee("editor@example.test", "villas:update");
+    expect((await transfer(from.id, { toEngineerId: to.id }, "en", editor)).status).toBe(200);
   });
 });

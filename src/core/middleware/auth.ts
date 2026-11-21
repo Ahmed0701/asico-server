@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { prisma } from "../database/prisma.js";
 import { AppError } from "../errors/AppError.js";
 import { t } from "../i18n/index.js";
+import { runWithVillaScope } from "../scope/villa-scope.js";
 import { ExpiredAccessTokenError, InvalidAccessTokenError, verifyAccessToken } from "../security/jwt.js";
 
 function bearerToken(header: string | undefined): string | undefined {
@@ -37,7 +38,7 @@ export async function auth(req: Request, _res: Response, next: NextFunction): Pr
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, role: true, isActive: true },
+    select: { id: true, role: true, isActive: true, electricalEngineer: { select: { id: true } } },
   });
   if (!user || !user.isActive) {
     next(unauthorized);
@@ -45,5 +46,8 @@ export async function auth(req: Request, _res: Response, next: NextFunction): Pr
   }
 
   req.user = { id: user.id, role: user.role };
-  next();
+  // A user linked to an electrical engineer sees only that engineer's villas for the rest of the request; an ADMIN is
+  // never limited.
+  const engineerId = user.role === "ADMIN" ? undefined : user.electricalEngineer?.id;
+  runWithVillaScope(engineerId ? { engineerId } : undefined, () => next());
 }

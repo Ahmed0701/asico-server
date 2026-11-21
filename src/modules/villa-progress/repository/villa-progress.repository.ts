@@ -1,4 +1,5 @@
 import { prisma } from "../../../core/database/prisma.js";
+import { andVillaScope } from "../../../core/scope/villa-scope.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import { PHASE_DONE_RATIO, WORK_PHASE_PROGRESS } from "./progress-rows.js";
 
@@ -24,7 +25,7 @@ export class VillaProgressRepository {
   // shared/constants/locks.ts). False: there is no such villa.
   async lockVilla(id: string, db: Db): Promise<boolean> {
     const rows = await db.$queryRaw<{ id: string }[]>(
-      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" = ${id} FOR SHARE`,
+      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" = ${id}${andVillaScope("Villa")} FOR SHARE`,
     );
     return rows.length === 1;
   }

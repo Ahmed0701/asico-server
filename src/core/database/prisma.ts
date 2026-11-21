@@ -1,6 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../../generated/prisma/client.js";
 import { env } from "../config/env.js";
+import { withVillaScope } from "../scope/villa-scope.js";
 import { TRANSACTION_DEFAULTS } from "./transactions.js";
 
 // A schema named in DATABASE_URL (?schema=) other than public is used for every connection; public, or none, changes nothing.
@@ -21,4 +22,5 @@ const adapter = new PrismaPg(
   ...(scratch ? [{ schema: scratch }] : []),
 );
 
-export const prisma = new PrismaClient({ adapter, transactionOptions: TRANSACTION_DEFAULTS });
+// Every model query carries the request's villa scope (see core/scope/villa-scope.ts).
+export const prisma = withVillaScope(new PrismaClient({ adapter, transactionOptions: TRANSACTION_DEFAULTS }));

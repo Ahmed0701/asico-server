@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { ifMatch } from "../../../core/concurrency/version.js";
 import { auth } from "../../../core/middleware/auth.js";
+import { denyEngineerScope } from "../../../core/middleware/denyEngineerScope.js";
 import { requirePermission } from "../../../core/middleware/requirePermission.js";
 import { validate } from "../../../core/middleware/validate.js";
 import { PERMISSIONS, type Permission } from "../../../shared/constants/permissions.js";
@@ -14,8 +15,8 @@ import {
 const controller = new VillaFinanceController();
 
 // Authentication first, then the permission, then validation. The villa's money is part of the villa: seen with
-// villas:read, changed with villas:update.
-const can = (permission: Permission) => [auth, requirePermission(permission)];
+// villas:read, changed with villas:update. A user linked to an electrical engineer never sees it.
+const can = (permission: Permission) => [auth, requirePermission(permission), denyEngineerScope];
 
 export const villaFinanceRouter = Router();
 

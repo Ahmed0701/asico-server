@@ -63,19 +63,23 @@ The tables are checked against the source by `tests/docs/errors.docs.test.ts`: a
 
 ### Users and permissions
 
-| Code                            | Status | When                                                                                        |
-| ------------------------------- | ------ | ------------------------------------------------------------------------------------------- |
-| `USER_NOT_FOUND`                | 404    | No such user.                                                                               |
-| `ADMIN_ACCOUNT_PROTECTED`       | 403    | Only the administrator can change the administrator account.                                |
-| `ADMIN_CANNOT_BE_DEACTIVATED`   | 403    | The administrator cannot be deactivated.                                                    |
-| `ADMIN_CANNOT_BE_DELETED`       | 403    | An ADMIN account cannot be deleted.                                                         |
-| `CANNOT_DELETE_SELF`            | 403    | A user cannot delete their own account.                                                     |
-| `USER_HAS_RECORDS`              | 409    | Deleting a user who created villas or uploaded villa documents: deactivate them instead.    |
-| `CANNOT_DEACTIVATE_SELF`        | 403    | A user cannot deactivate their own account.                                                 |
-| `ADMIN_PERMISSIONS_IMMUTABLE`   | 403    | An administrator's permissions are implied by the role and cannot be edited.                |
-| `CANNOT_MODIFY_OWN_PERMISSIONS` | 403    | A user cannot change their own permissions.                                                 |
-| `PERMISSION_ASSIGN_REQUIRED`    | 403    | Creating a user with permissions needs `permissions:assign` as well as `users:create`.      |
-| `EMAIL_DELIVERY_FAILED`         | 502    | The password-reset email could not be sent. The user's sessions were signed out; try again. |
+| Code                            | Status | When                                                                                                            |
+| ------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------- |
+| `USER_NOT_FOUND`                | 404    | No such user.                                                                                                   |
+| `ADMIN_ACCOUNT_PROTECTED`       | 403    | Only the administrator can change the administrator account.                                                    |
+| `ROLE_ADMIN_ONLY`               | 403    | Only an ADMIN chooses who is an ADMIN (creating one, or changing a user's role).                                |
+| `USER_ROLE_SELF`                | 422    | Changing your own role.                                                                                         |
+| `USER_IS_ENGINEER_ACCOUNT`      | 409    | Making the account of an electrical engineer an ADMIN: unlink it first.                                         |
+| `ADMIN_CANNOT_BE_DEACTIVATED`   | 403    | The administrator cannot be deactivated.                                                                        |
+| `ADMIN_CANNOT_BE_DELETED`       | 403    | An ADMIN account cannot be deleted.                                                                             |
+| `CANNOT_DELETE_SELF`            | 403    | A user cannot delete their own account.                                                                         |
+| `USER_HAS_RECORDS`              | 409    | Deleting a user who created villas or uploaded villa documents: deactivate them instead.                        |
+| `USER_ENGINEER_HAS_VILLAS`      | 409    | Deleting the user account of an electrical engineer that still has villas: move them to another engineer first. |
+| `CANNOT_DEACTIVATE_SELF`        | 403    | A user cannot deactivate their own account.                                                                     |
+| `ADMIN_PERMISSIONS_IMMUTABLE`   | 403    | An administrator's permissions are implied by the role and cannot be edited.                                    |
+| `CANNOT_MODIFY_OWN_PERMISSIONS` | 403    | A user cannot change their own permissions.                                                                     |
+| `PERMISSION_ASSIGN_REQUIRED`    | 403    | Creating a user with permissions needs `permissions:assign` as well as `users:create`.                          |
+| `EMAIL_DELIVERY_FAILED`         | 502    | The password-reset email could not be sent. The user's sessions were signed out; try again.                     |
 
 ### Write safety
 
@@ -99,11 +103,14 @@ See [write-safety.md](write-safety.md).
 | `AREA_TAKEN`                    | 409    | An area with this name already exists in the city.                                                                 |
 | `AREA_HAS_VILLAS`               | 409    | The area has villas and cannot be deleted.                                                                         |
 | `CIVIL_ENGINEER_NOT_FOUND`      | 404    | No such civil engineer.                                                                                            |
-| `CIVIL_ENGINEER_INACTIVE`       | 400    | An inactive civil engineer cannot be given to a villa.                                                             |
+| `CIVIL_ENGINEER_INACTIVE`       | 400    | An inactive civil engineer cannot be given to a villa, or take another engineer's villas.                                                   |
 | `CIVIL_ENGINEER_HAS_VILLAS`     | 409    | The engineer has villas and cannot be deleted.                                                                     |
 | `ELECTRICAL_ENGINEER_NOT_FOUND` | 404    | No such electrical engineer.                                                                                       |
 | `ELECTRICAL_ENGINEER_INACTIVE`  | 400    | An inactive electrical engineer cannot be given to a villa or a daily report.                                      |
 | `ELECTRICAL_ENGINEER_IN_USE`    | 409    | The engineer has villas or daily reports and cannot be deleted.                                                    |
+| `ENGINEER_USER_TAKEN`           | 409    | Linking a user to an electrical engineer when it is already linked to another one.                                 |
+| `TRANSFER_SAME_ENGINEER`        | 422    | Moving an engineer's villas to that same engineer.                                                                 |
+| `ENGINEER_USER_ADMIN`           | 422    | Linking an ADMIN to an electrical engineer (an ADMIN always sees every villa).                                     |
 | `CONTRACTOR_NOT_FOUND`          | 404    | No such contractor.                                                                                                |
 | `CONTRACTOR_INACTIVE`           | 400    | An inactive contractor cannot be given to a villa, a daily report, an open work, a small work or a labour row.     |
 | `CONTRACTOR_HAS_VILLAS`         | 409    | The contractor is linked to villas or records and cannot be deleted.                                               |
@@ -118,6 +125,7 @@ See [write-safety.md](write-safety.md).
 | Code                                  | Status | When                                                                                                                                                      |
 | ------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `VILLA_NOT_FOUND`                     | 404    | No such villa (also: a record pointing at one).                                                                                                           |
+| `VILLA_ENGINEER_OUT_OF_SCOPE`         | 422    | A user linked to an electrical engineer giving a villa to another engineer.                                                                               |
 | `VILLA_NUMBER_TAKEN`                  | 409    | Another villa has this number.                                                                                                                            |
 | `VILLA_PLOT_TAKEN`                    | 409    | Another villa is on this area, block and plot.                                                                                                            |
 | `VILLA_HAS_RECORDS`                   | 409    | The villa has open works added by hand, small works, site reports, labour, or additional expenses: delete them first. (Daily reports belong to no villa.) |

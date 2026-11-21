@@ -1,4 +1,11 @@
 import { prisma } from "../../../core/database/prisma.js";
+import {
+  andOwnEngineer,
+  andVillaIdScope,
+  andVillaScope,
+  whereVillaIdScope,
+  whereVillaScope,
+} from "../../../core/scope/villa-scope.js";
 import type { Prisma } from "../../../generated/prisma/client.js";
 import {
   PHASE_DONE_RATIO,
@@ -124,7 +131,7 @@ export class DashboardRepository {
         count(*) FILTER (
           WHERE v."mewInspectionAt" IS NOT NULL AND v."mewInspectionPassedAt" IS NULL
         ) AS "mewInspection"
-      FROM "Villa" v`;
+      FROM "Villa" v${whereVillaScope("v")}`;
     return only(rows, "villa");
   }
 
@@ -140,13 +147,13 @@ export class DashboardRepository {
         FROM "Villa" v
         CROSS JOIN "ElecPhase" ph
         LEFT JOIN ${WORK_PHASE_PROGRESS()} wp ON wp."villaId" = v."id" AND wp."elecPhaseId" = ph."id"
-        WHERE ph."status" = 'ACTIVE'
+        WHERE ph."status" = 'ACTIVE'${andVillaScope("v")}
       ),
       per AS (
         SELECT v."id", COALESCE(sum(phase."progress"), 0) AS "total",
           LEAST(100, COALESCE(sum(phase."doneRatio"), 0)) AS "overall"
         FROM "Villa" v
-        LEFT JOIN phase ON phase."villaId" = v."id"
+        LEFT JOIN phase ON phase."villaId" = v."id"${whereVillaScope("v")}
         GROUP BY v."id"
       )
       SELECT
@@ -169,7 +176,7 @@ export class DashboardRepository {
         a."city" AS "city",
         count(*) AS "total"
       FROM "Villa" v
-      JOIN "Area" a ON a."id" = v."areaId"
+      JOIN "Area" a ON a."id" = v."areaId"${whereVillaScope("v")}
       GROUP BY a."id", a."name", a."city"
       ORDER BY count(*) DESC, a."name" ASC, a."city" ASC, a."id" ASC
       LIMIT ${TOP_AREAS}`;
@@ -183,7 +190,7 @@ export class DashboardRepository {
         c."name" AS "name",
         count(*) AS "total"
       FROM "Villa" v
-      JOIN "Contractor" c ON c."id" = v."contractorId"
+      JOIN "Contractor" c ON c."id" = v."contractorId"${whereVillaScope("v")}
       GROUP BY c."id", c."name"
       ORDER BY count(*) DESC, c."name" ASC, c."id" ASC
       LIMIT ${TOP_CONTRACTORS}`;
@@ -197,7 +204,7 @@ export class DashboardRepository {
       JOIN "Villa" v ON v."id" = w."villaId"
       JOIN "ElecPhase" p ON p."id" = w."elecPhaseId"
       LEFT JOIN "Contractor" c ON c."id" = w."contractorId"
-      WHERE w."endDate" < ${asDay(today)}::date AND w."status" <> 'DONE'
+      WHERE w."endDate" < ${asDay(today)}::date AND w."status" <> 'DONE'${andVillaScope("v")}
       ORDER BY w."endDate" ASC, w."createdAt" ASC, w."id" ASC
       LIMIT ${limit}`;
   }
@@ -212,7 +219,7 @@ export class DashboardRepository {
         count(*) FILTER (WHERE w."status" = 'DELAYED') AS "delayed",
         count(*) FILTER (WHERE w."status" = 'DONE') AS "done",
         count(*) FILTER (WHERE w."endDate" < ${asDay(today)}::date AND w."status" <> 'DONE') AS "overdue"
-      FROM "WorkItem" w`;
+      FROM "WorkItem" w${whereVillaIdScope('w."villaId"')}`;
     return only(rows, "open works");
   }
 
@@ -226,7 +233,7 @@ export class DashboardRepository {
           WHERE r."reportDate" >= ${asDay(weekStart)}::date AND r."reportDate" <= ${asDay(today)}::date
         ) AS "last7Days"
       FROM "DailyReport" r
-      WHERE r."reportDate" >= ${asDay(weekStart)}::date AND r."reportDate" <= ${asDay(today)}::date`;
+      WHERE r."reportDate" >= ${asDay(weekStart)}::date AND r."reportDate" <= ${asDay(today)}::date${andOwnEngineer('r."preparedByEngineerId"')}`;
     return only(rows, "daily reports");
   }
 
@@ -239,7 +246,7 @@ export class DashboardRepository {
           WHERE w."status" = 'PENDING' AND w."endDate" >= ${today}::date AND w."endDate" < ${horizon}::date
         ) AS "dueSoon",
         count(*) FILTER (WHERE w."status" = 'PENDING' AND w."endDate" < ${today}::date) AS "overdue"
-      FROM "DailySmallWork" w`;
+      FROM "DailySmallWork" w${whereVillaIdScope('w."villaId"')}`;
     return only(rows, "small works");
   }
 
@@ -251,7 +258,7 @@ export class DashboardRepository {
       FROM "DailySmallWork" w
       JOIN "Villa" v ON v."id" = w."villaId"
       JOIN "Contractor" c ON c."id" = w."contractorId"
-      WHERE w."status" = 'PENDING' AND w."endDate" < ${horizon}::date
+      WHERE w."status" = 'PENDING' AND w."endDate" < ${horizon}::date${andVillaScope("v")}
       ORDER BY w."endDate" ASC, w."createdAt" ASC, w."id" ASC
       LIMIT ${limit}`;
   }
@@ -259,7 +266,7 @@ export class DashboardRepository {
   async siteReportCounters(db: Db = prisma): Promise<SiteReportCounterRow> {
     const rows = await db.$queryRaw<SiteReportCounterRow[]>`
       SELECT count(*) AS "total", COALESCE(sum(r."rating"), 0) AS "ratingSum"
-      FROM "SiteReport" r`;
+      FROM "SiteReport" r${whereVillaIdScope('r."villaId"')}`;
     return only(rows, "site reports");
   }
 
@@ -273,7 +280,7 @@ export class DashboardRepository {
           WHERE l."labourDate" >= ${asDay(weekStart)}::date AND l."labourDate" <= ${asDay(today)}::date
         ), 0) AS "last7Days"
       FROM "DailyLabour" l
-      WHERE l."labourDate" >= ${asDay(weekStart)}::date AND l."labourDate" <= ${asDay(today)}::date`;
+      WHERE l."labourDate" >= ${asDay(weekStart)}::date AND l."labourDate" <= ${asDay(today)}::date${andVillaIdScope('l."villaId"')}`;
     return only(rows, "labour");
   }
 
@@ -288,7 +295,7 @@ export class DashboardRepository {
         COALESCE(sum(r."workersCount") FILTER (WHERE r."reportDate" = ${asDay(today)}::date), 0) AS "today",
         COALESCE(sum(r."workersCount") FILTER (WHERE r."reportDate" = ${asDay(today)}::date - 1), 0) AS "yesterday"
       FROM "DailyReport" r
-      WHERE r."reportDate" >= ${asDay(today)}::date - 1 AND r."reportDate" <= ${asDay(today)}::date`;
+      WHERE r."reportDate" >= ${asDay(today)}::date - 1 AND r."reportDate" <= ${asDay(today)}::date${andOwnEngineer('r."preparedByEngineerId"')}`;
     return only(rows, "daily report workers");
   }
 
@@ -314,7 +321,7 @@ export class DashboardRepository {
           WHERE p."status" = 'PAID' AND p."paidDate" >= date_trunc('month', ${today}::date)::date
             AND p."paidDate" <= ${today}::date
         ), 0) AS "paidThisMonthMinor"
-      FROM "ContractorPayment" p`;
+      FROM "ContractorPayment" p${whereVillaIdScope('p."villaId"')}`;
     return only(rows, "payments");
   }
 
@@ -323,7 +330,7 @@ export class DashboardRepository {
       SELECT
         count(*) FILTER (WHERE o."doneAt" IS NULL) AS "open",
         count(*) FILTER (WHERE o."doneAt" IS NOT NULL) AS "done"
-      FROM "OwnerNote" o`;
+      FROM "OwnerNote" o${whereVillaIdScope('o."villaId"')}`;
     return only(rows, "owner notes");
   }
 
@@ -332,7 +339,7 @@ export class DashboardRepository {
       SELECT
         count(*) FILTER (WHERE o."doneAt" IS NULL) AS "open",
         count(*) FILTER (WHERE o."doneAt" IS NOT NULL) AS "done"
-      FROM "ForemanMission" o`;
+      FROM "ForemanMission" o${whereVillaIdScope('o."villaId"')}`;
     return only(rows, "foreman missions");
   }
 

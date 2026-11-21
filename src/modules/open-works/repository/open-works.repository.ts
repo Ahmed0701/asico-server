@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { andVillaScope, villaScopeConditions } from "../../../core/scope/villa-scope.js";
 import { lockVersion } from "../../../core/concurrency/version.js";
 import { prisma } from "../../../core/database/prisma.js";
 import { Prisma } from "../../../generated/prisma/client.js";
@@ -78,7 +79,8 @@ type ListParams = { filters: OpenWorkFilters; sort: OpenWorkSort; today: Date; s
 // one WHERE. A pattern is escaped, so `%`, `_` and a backslash in a value match themselves. Enum values are cast, since
 // they travel as text.
 function conditionsOf(filters: OpenWorkFilters, today: Date): Prisma.Sql[] {
-  const conditions: Prisma.Sql[] = [];
+  // Only the villas of the signed-in engineer, when it is one.
+  const conditions: Prisma.Sql[] = [...villaScopeConditions("v")];
   if (filters.villaId) conditions.push(Prisma.sql`w."villaId" = ${filters.villaId}`);
   if (filters.elecPhaseId) conditions.push(Prisma.sql`w."elecPhaseId" = ${filters.elecPhaseId}`);
   if (filters.status) conditions.push(Prisma.sql`w."status" = ${filters.status}::"WorkStatus"`);
@@ -189,7 +191,7 @@ export class OpenWorksRepository {
   // items take turns with a change of contractor and not with each other. Null: there is no such villa.
   async lockVillaShared(villaId: string, db: Db): Promise<{ contractorId: string | null } | null> {
     const rows = await db.$queryRaw<{ contractorId: string | null }[]>(
-      Prisma.sql`SELECT "contractorId" FROM "Villa" WHERE "id" = ${villaId} FOR SHARE`,
+      Prisma.sql`SELECT "contractorId" FROM "Villa" WHERE "id" = ${villaId}${andVillaScope("Villa")} FOR SHARE`,
     );
     return rows[0] ?? null;
   }
@@ -283,7 +285,7 @@ export class OpenWorksRepository {
       return new Map();
     }
     const rows = await db.$queryRaw<{ id: string; contractorId: string | null }[]>(
-      Prisma.sql`SELECT "id", "contractorId" FROM "Villa" WHERE "id" IN (${Prisma.join([...villaIds])})
+      Prisma.sql`SELECT "id", "contractorId" FROM "Villa" WHERE "id" IN (${Prisma.join([...villaIds])})${andVillaScope("Villa")}
         ORDER BY "id" FOR SHARE`,
     );
     return new Map(rows.map((row) => [row.id, row.contractorId]));

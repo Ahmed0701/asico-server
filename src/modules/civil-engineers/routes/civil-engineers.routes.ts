@@ -11,6 +11,7 @@ import {
   createCivilEngineerSchema,
   listCivilEngineersQuerySchema,
   updateCivilEngineerSchema,
+  transferVillasSchema,
 } from "../validators/civil-engineers.validators.js";
 
 const controller = new CivilEngineersController();
@@ -59,4 +60,13 @@ civilEngineersRouter.delete(
   validate(idParams, "params"),
   ifMatch(),
   controller.remove,
+);
+
+// Moves every villa of the engineer to another one (villas:update), so the engineer can then be deleted.
+civilEngineersRouter.post(
+  "/civil-engineers/:id/transfer-villas",
+  ...can(PERMISSIONS.VILLAS_UPDATE),
+  validate(idParams, "params"),
+  validate(transferVillasSchema, "body"),
+  controller.transferVillas,
 );

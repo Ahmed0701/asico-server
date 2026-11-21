@@ -7,7 +7,12 @@ import { validate } from "../../../core/middleware/validate.js";
 import { PERMISSIONS } from "../../../shared/constants/permissions.js";
 import { idParams } from "../../../shared/validation/fields.js";
 import { UsersController } from "../controller/users.controller.js";
-import { createUserSchema, listUsersQuerySchema, updateUserSchema } from "../validators/users.validators.js";
+import {
+  createUserSchema,
+  listUsersQuerySchema,
+  setUserRoleSchema,
+  updateUserSchema,
+} from "../validators/users.validators.js";
 
 const controller = new UsersController();
 
@@ -37,6 +42,15 @@ usersRouter.patch(
   ifMatch(),
   validate(updateUserSchema),
   controller.update,
+);
+// Makes a user an ADMIN or an EMPLOYEE (an engineer). users:update, and the caller must be an ADMIN (the service checks).
+usersRouter.patch(
+  "/users/:id/role",
+  ...can(PERMISSIONS.USERS_UPDATE),
+  validate(idParams, "params"),
+  ifMatch(),
+  validate(setUserRoleSchema),
+  controller.setRole,
 );
 // Starts a password reset for another user: a link by email, their sessions signed out. Only the ADMIN may do it to
 // the ADMIN account (the service checks).

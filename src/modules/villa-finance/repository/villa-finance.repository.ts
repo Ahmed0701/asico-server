@@ -1,4 +1,5 @@
 import { prisma } from "../../../core/database/prisma.js";
+import { andVillaScope } from "../../../core/scope/villa-scope.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 
 export type Db = Prisma.TransactionClient;
@@ -110,7 +111,7 @@ export class VillaFinanceRepository {
   // transaction. Two saves of one villa take turns. False: no such villa.
   async lock(villaId: string, db: Db): Promise<boolean> {
     const villa = await db.$queryRaw<{ id: string }[]>(
-      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" = ${villaId} FOR UPDATE`,
+      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" = ${villaId}${andVillaScope("Villa")} FOR UPDATE`,
     );
     if (villa.length === 0) return false;
     await db.$queryRaw(

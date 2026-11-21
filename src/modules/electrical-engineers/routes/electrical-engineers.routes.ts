@@ -11,6 +11,7 @@ import {
   createElectricalEngineerSchema,
   listElectricalEngineersQuerySchema,
   updateElectricalEngineerSchema,
+  transferVillasSchema,
 } from "../validators/electrical-engineers.validators.js";
 
 const controller = new ElectricalEngineersController();
@@ -31,6 +32,12 @@ electricalEngineersRouter.get(
   "/electrical-engineers/options",
   ...can(PERMISSIONS.ELECTRICAL_ENGINEERS_READ),
   controller.options,
+);
+// The users the engineer form can link (for whoever may create or change engineers). Above "/:id" too.
+electricalEngineersRouter.get(
+  "/electrical-engineers/user-options",
+  ...can(PERMISSIONS.ELECTRICAL_ENGINEERS_UPDATE),
+  controller.userOptions,
 );
 electricalEngineersRouter.get(
   "/electrical-engineers/:id",
@@ -59,4 +66,13 @@ electricalEngineersRouter.delete(
   validate(idParams, "params"),
   ifMatch(),
   controller.remove,
+);
+
+// Moves every villa of the engineer to another one (villas:update), so the engineer can then be deleted.
+electricalEngineersRouter.post(
+  "/electrical-engineers/:id/transfer-villas",
+  ...can(PERMISSIONS.VILLAS_UPDATE),
+  validate(idParams, "params"),
+  validate(transferVillasSchema, "body"),
+  controller.transferVillas,
 );

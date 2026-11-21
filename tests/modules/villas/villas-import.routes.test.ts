@@ -116,6 +116,11 @@ const as = async (user: User): Promise<{ Authorization: string }> => ({
   Authorization: `Bearer ${await signAccessToken({ id: user.id, role: user.role })}`,
 });
 
+// Another administrator, with an allowance of its own.
+function otherAdmin(email: string): User {
+  return store.addUser({ name: "Another Admin", email, passwordHash: "x", role: "ADMIN" });
+}
+
 function employee(email: string, ...codes: string[]): User {
   const user = store.addUser({ name: "Some Employee", email, passwordHash: "x" });
   store.grant(user.id, ...codes);
@@ -237,8 +242,21 @@ describe("access control", () => {
     expect((await request(app).get("/api/v1/villas/export?format=xlsx").set(headers)).status).toBe(403);
   });
 
-  it("lets the holder of villas:import use both routes", async () => {
+  it("refuses both routes to an employee even with villas:import: only an administrator adds villas", async () => {
     const user = employee("importer@example.test", "villas:import");
+
+    expect(
+      (
+        await request(app)
+          .get("/api/v1/villas/import/template")
+          .set(await as(user))
+      ).status,
+    ).toBe(403);
+    expect((await upload(await one(), { user })).status).toBe(403);
+  });
+
+  it("lets an administrator use both routes", async () => {
+    const user = otherAdmin("importer@example.test");
 
     expect(
       (
@@ -1551,7 +1569,7 @@ describe("POST /villas/import: the file", () => {
 
   it("shares the import allowance of the user", async () => {
     env.IMPORT_RATE_LIMIT_MAX = 2;
-    const user = employee("limited@example.test", "villas:import");
+    const user = otherAdmin("limited@example.test");
 
     expect((await upload(await one({ "Villa Number": "A" }), { user })).status).toBe(201);
     expect((await upload(await one({ "Villa Number": "B", Plot: "2" }), { user })).status).toBe(201);
@@ -1562,7 +1580,7 @@ describe("POST /villas/import: the file", () => {
 
   it("counts the template against the same allowance", async () => {
     env.IMPORT_RATE_LIMIT_MAX = 1;
-    const user = employee("template@example.test", "villas:import");
+    const user = otherAdmin("template@example.test");
 
     const first = await request(app)
       .get("/api/v1/villas/import/template")

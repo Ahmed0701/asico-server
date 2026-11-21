@@ -30,6 +30,7 @@ const ENGLISH: Record<string, string> = {
   "civil_engineer.create": "Created a civil engineer",
   "civil_engineer.update": "Updated a civil engineer",
   "civil_engineer.delete": "Deleted a civil engineer",
+  "civil_engineer.transfer_villas": "Moved a civil engineer's villas to another engineer",
   "contractor.create": "Created a contractor",
   "contractor.update": "Updated a contractor",
   "contractor.delete": "Deleted a contractor",
@@ -49,6 +50,7 @@ const ENGLISH: Record<string, string> = {
   "electrical_engineer.create": "Created an electrical engineer",
   "electrical_engineer.update": "Updated an electrical engineer",
   "electrical_engineer.delete": "Deleted an electrical engineer",
+  "electrical_engineer.transfer_villas": "Moved an electrical engineer's villas to another engineer",
   "export.areas": "Exported areas",
   "export.audit-logs": "Exported the audit log",
   "export.civil-engineers": "Exported civil engineers",
@@ -79,6 +81,7 @@ const ENGLISH: Record<string, string> = {
   "small_work.import": "Imported daily small works",
   "user.create": "Created a user",
   "user.update": "Updated a user",
+  "user.role_change": "Changed a user's role (administrator or engineer)",
   "user.activate": "Activated a user",
   "user.deactivate": "Deactivated a user",
   "user.delete": "Deleted a user",
@@ -167,7 +170,7 @@ const ENGLISH: Record<string, string> = {
 describe("action labels", () => {
   it("knows exactly the actions of the list above", () => {
     expect(Object.keys(ACTION_LABEL_KEYS).sort()).toEqual(Object.keys(ENGLISH).sort());
-    expect(Object.keys(ENGLISH)).toHaveLength(143);
+    expect(Object.keys(ENGLISH)).toHaveLength(146);
   });
 
   it.each(Object.entries(ENGLISH))("%s reads %j in English", (code, english) => {

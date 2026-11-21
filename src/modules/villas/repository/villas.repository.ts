@@ -1,4 +1,5 @@
 import type { MewStateValue } from "../../../shared/constants/enums.js";
+import { villaScopeConditions } from "../../../core/scope/villa-scope.js";
 import { randomUUID } from "node:crypto";
 import { lockVersion } from "../../../core/concurrency/version.js";
 import { prisma } from "../../../core/database/prisma.js";
@@ -183,7 +184,8 @@ type ListParams = { filters: VillaFilters; sort: VillaSort; skip: number; take: 
 // the rows are then loaded with findMany and put back in that order. The page and the count share one WHERE.
 // A pattern is escaped, so `%`, `_` and a backslash in a value match themselves.
 function conditionsOf(filters: VillaFilters): Prisma.Sql[] {
-  const conditions: Prisma.Sql[] = [];
+  // Only the villas of the signed-in engineer, when it is one.
+  const conditions: Prisma.Sql[] = [...villaScopeConditions("v")];
   if (filters.areaId) conditions.push(Prisma.sql`v."areaId" = ${filters.areaId}`);
   if (filters.area) conditions.push(Prisma.sql`a."name" ILIKE ${escapeLike(filters.area)}`);
   if (filters.block) conditions.push(Prisma.sql`v."block" ILIKE ${escapeLike(filters.block)}`);

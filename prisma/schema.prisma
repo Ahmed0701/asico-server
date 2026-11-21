@@ -109,6 +109,7 @@ model User {
   uploadedVillaImages VillaImage[]            @relation("VillaImageUploader")
   uploadedMewReports  MewInspectionReport[]   @relation("MewReportUploader")
   progressPayments    ProgressPayment[]       @relation("ProgressPaymentPayer")
+  electricalEngineer  ElectricalEngineer?     @relation("ElectricalEngineerUser")
   auditLogs           AuditLog[]
   idempotencyKeys     IdempotencyKey[]
   importBatches       ImportBatch[]
@@ -187,6 +188,9 @@ model ElectricalEngineer {
   phone        String
   email        String?
   status       PartyStatus   @default(ACTIVE)
+  // The user account of the engineer: signed in, it sees only this engineer's villas. One user per engineer.
+  userId       String?       @unique
+  user         User?         @relation("ElectricalEngineerUser", fields: [userId], references: [id], onDelete: SetNull)
   villas       Villa[]
   // The daily reports this engineer prepared. An engineer with reports cannot be deleted.
   dailyReports DailyReport[]

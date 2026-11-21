@@ -8,6 +8,7 @@ export function toElectricalEngineerDto(row: ElectricalEngineerRow): ElectricalE
     phone: row.phone,
     email: row.email,
     status: row.status,
+    user: row.user,
     villaCount: row._count.villas,
     version: row.version,
     createdAt: row.createdAt.toISOString(),

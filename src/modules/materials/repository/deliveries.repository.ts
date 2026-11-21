@@ -1,4 +1,5 @@
 import { lockVersion } from "../../../core/concurrency/version.js";
+import { andVillaScope } from "../../../core/scope/villa-scope.js";
 import { prisma } from "../../../core/database/prisma.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import type { FactoryTypeValue } from "../../../shared/constants/enums.js";
@@ -154,7 +155,7 @@ export class DeliveriesRepository {
   async lockVillasShared(villaIds: readonly string[], db: Db): Promise<Set<string>> {
     if (villaIds.length === 0) return new Set();
     const rows = await db.$queryRaw<{ id: string }[]>(
-      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" IN (${Prisma.join([...villaIds])}) ORDER BY "id" FOR SHARE`,
+      Prisma.sql`SELECT "id" FROM "Villa" WHERE "id" IN (${Prisma.join([...villaIds])})${andVillaScope("Villa")} ORDER BY "id" FOR SHARE`,
     );
     return new Set(rows.map((row) => row.id));
   }
